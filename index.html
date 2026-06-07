@@ -361,8 +361,9 @@ body{
 /* weekday/date axis row */
 .hg-axis-cell{font-size:9.5px;font-weight:700;color:var(--text-3);text-align:center;line-height:1.15;
   text-transform:uppercase;letter-spacing:.2px;padding-bottom:4px;}
-.hg-axis-cell .ax-dow{display:block;}
-.hg-axis-cell .ax-day{display:block;font-size:11px;font-weight:700;color:var(--text-2);}
+.hg-axis-cell{display:flex;align-items:baseline;justify-content:center;gap:3px;white-space:nowrap;}
+.hg-axis-cell .ax-dow{display:inline;}
+.hg-axis-cell .ax-day{display:inline;font-size:11px;font-weight:700;color:var(--text-2);}
 .hg-axis-cell.is-today .ax-dow,.hg-axis-cell.is-today .ax-day{color:var(--blue);}
 .hg-axis-corner{}
 /* habit name cell */
