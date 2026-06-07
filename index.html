@@ -359,11 +359,12 @@ body{
 /* one CSS grid: a label column + N equal day columns that share the width */
 .hg-table{display:grid;gap:5px;align-items:center;}
 /* weekday/date axis row */
-.hg-axis-cell{font-size:9.5px;font-weight:700;color:var(--text-3);text-align:center;line-height:1.15;
-  text-transform:uppercase;letter-spacing:.2px;padding-bottom:4px;}
-.hg-axis-cell{display:flex;align-items:baseline;justify-content:center;gap:3px;white-space:nowrap;}
-.hg-axis-cell .ax-dow{display:inline;}
-.hg-axis-cell .ax-day{display:inline;font-size:11px;font-weight:700;color:var(--text-2);}
+.hg-axis-cell{font-size:9.5px;font-weight:700;color:var(--text-3);text-align:center;line-height:1.1;
+  text-transform:uppercase;letter-spacing:.2px;padding-bottom:6px;
+  display:flex;flex-direction:column;align-items:center;gap:1px;}
+.hg-axis-cell .ax-dow{display:block;}
+.hg-axis-cell .ax-day{display:block;font-size:11px;font-weight:700;color:var(--text-2);
+  white-space:nowrap;}
 .hg-axis-cell.is-today .ax-dow,.hg-axis-cell.is-today .ax-day{color:var(--blue);}
 .hg-axis-corner{}
 /* habit name cell */
@@ -377,7 +378,8 @@ body{
 .sq{aspect-ratio:1/1;width:100%;max-width:26px;margin:0 auto;border-radius:6px;background:rgba(255,255,255,0.06);
   transition:transform .12s var(--ease);}
 .sq.on{box-shadow:inset 0 0 0 0.5px rgba(255,255,255,0.2);}
-.sq.col-today{outline:1.5px solid var(--blue);outline-offset:2px;}
+.sq.col-today{box-shadow:inset 0 0 0 1.5px var(--blue);}
+.sq.on.col-today{box-shadow:inset 0 0 0 1.5px var(--blue),inset 0 0 0 0.5px rgba(255,255,255,0.2);}
 /* footer note */
 .hg-foot{display:flex;align-items:center;gap:14px;margin-top:14px;font-size:11px;color:var(--text-3);
   flex-wrap:wrap;}
@@ -385,6 +387,15 @@ body{
 .hg-foot .lg .sq{width:13px;height:13px;flex:none;}
 .hg-foot .lg .sq.demo-on{background:var(--blue);}
 .hg-range{font-size:11px;color:var(--text-3);font-weight:600;margin-bottom:2px;}
+/* narrow phones: tighter axis + smaller squares so columns breathe */
+@media (max-width:430px){
+  .hg-axis-cell{font-size:8.5px;padding-bottom:5px;gap:0;}
+  .hg-axis-cell .ax-day{font-size:10px;}
+  .hg-name{gap:6px;padding-right:4px;}
+  .hg-name .ntxt{font-size:11.5px;}
+  .hg-name .ndot{width:8px;height:8px;}
+  .sq{max-width:22px;border-radius:5px;}
+}
 
 /* ===== detail sheet ===== */
 .sheet-bg{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
@@ -1422,8 +1433,12 @@ function renderHabitTable(){
   const range='<div class="hg-range">'+fmtShort(cols[0])+' – '+(cols[cols.length-1]===tKey?'Today':fmtShort(cols[cols.length-1]))+'</div>';
 
   // grid template: a flexible label column + N equal day tracks
-  const tpl='minmax(108px, 1.5fr) repeat('+cols.length+', minmax(0,1fr))';
-  let html='<div class="hgrid">'+range+'<div class="hg-table" style="grid-template-columns:'+tpl+'">';
+  // narrow screens get a slimmer label column and tighter gap so day cells stay readable
+  const vw=window.innerWidth||390;
+  const labelMin=vw<430?78:108;
+  const gap=vw<430?3:5;
+  const tpl='minmax('+labelMin+'px, 1.4fr) repeat('+cols.length+', minmax(0,1fr))';
+  let html='<div class="hgrid">'+range+'<div class="hg-table" style="grid-template-columns:'+tpl+';gap:'+gap+'px">';
 
   // axis row: empty corner + weekday/day per column
   html+='<div class="hg-axis-corner"></div>';
@@ -1446,7 +1461,8 @@ function renderHabitTable(){
       const dt=new Date(d+'T00:00:00');
       const nice=dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
       const title=escapeHtml(h.name)+' · '+nice+' · '+(on?'done':'missed');
-      const style=on?'background:'+h.color+';box-shadow:inset 0 0 0 0.5px rgba(255,255,255,0.2),0 0 6px '+h.color+'55':'';
+      const ring=(d===tKey)?'inset 0 0 0 1.5px '+'var(--blue),':'';
+      const style=on?'background:'+h.color+';box-shadow:'+ring+'inset 0 0 0 0.5px rgba(255,255,255,0.2),0 0 6px '+h.color+'55':'';
       html+='<div class="sq'+(on?' on':'')+(d===tKey?' col-today':'')+'" style="'+style+'" title="'+title+'"></div>';
     });
   });
@@ -1461,8 +1477,8 @@ function renderHabitTable(){
 /* how many day-columns to show: fewer on narrow screens so squares stay tappable */
 function daysPerWindow(){
   const w=window.innerWidth||390;
-  if(w<360)return 9;
-  if(w<430)return 12;
+  if(w<360)return 7;
+  if(w<430)return 10;
   if(w<560)return 16;
   return 20;
 }
