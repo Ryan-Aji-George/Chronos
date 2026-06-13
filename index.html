@@ -95,7 +95,7 @@ body{
   text-transform:uppercase;line-height:1;
   font-variant-numeric:tabular-nums;}
 
-.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 16px 116px;}
+.view{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px 16px 116px;}
 .view::-webkit-scrollbar{width:0;}
 .hidden{display:none!important;}
 
@@ -2094,15 +2094,20 @@ function openWeekGoals(){
   function syncDots(){var n=input.value.length;dots.forEach(function(d,i){d.classList.toggle('on',i<n);});}
   function focusInput(){try{input.focus({preventScroll:true});}catch(e){try{input.focus();}catch(e){}}}
   function unlock(){
-    // success cascade on dots, then card out, then drop lock
-    dots.forEach(function(d,i){setTimeout(function(){d.classList.remove('on');d.classList.add('success');},i*55);});
-    setTimeout(function(){screen.classList.add('unlocking');},dots.length*55+40);
+    // dismiss keyboard first, then play unlock animation
+    try{input.blur();}catch(e){}
+    if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+    var KB_WAIT=320;
     setTimeout(function(){
-      document.documentElement.classList.remove('locked');
-      screen.style.display='none';
-      screen.classList.remove('unlocking');
-      dots.forEach(function(d){d.classList.remove('success');});
-    },dots.length*55+600);
+      dots.forEach(function(d,i){setTimeout(function(){d.classList.remove('on');d.classList.add('success');},i*55);});
+      setTimeout(function(){screen.classList.add('unlocking');},dots.length*55+40);
+      setTimeout(function(){
+        document.documentElement.classList.remove('locked');
+        screen.style.display='none';
+        screen.classList.remove('unlocking');
+        dots.forEach(function(d){d.classList.remove('success');});
+      },dots.length*55+600);
+    },KB_WAIT);
   }
   function fail(){
     err.classList.add('show');card.classList.add('shake');
