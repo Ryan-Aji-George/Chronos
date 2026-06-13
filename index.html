@@ -264,15 +264,46 @@ body{
 .goal-more svg{width:15px;height:15px;transition:transform .3s var(--ease);}
 .goal-more.open svg{transform:rotate(180deg);}
 
-/* vision board */
-#timerView{scroll-snap-type:y proximity;scroll-padding-top:0;}
-.vision-wrap{margin-top:18px;display:flex;align-items:center;justify-content:center;
-  scroll-snap-align:start;scroll-snap-stop:always;padding:0;
-  min-height:calc(100dvh - 208px);}
+/* vision board — JS-controlled strict 2-state snap */
+#timerView{scroll-snap-type:none;}
+.vision-wrap{margin-top:24px;display:flex;align-items:center;justify-content:center;padding:0;
+  min-height:calc(100dvh - 200px);}
 .vision-wrap[hidden]{display:none;}
-.vision-img{display:block;max-width:100%;max-height:calc(100dvh - 220px);width:auto;height:auto;
-  object-fit:contain;border-radius:18px;
-  border:0.5px solid var(--hair);box-shadow:0 10px 36px rgba(0,0,0,.45),inset 0 0.5px 0 rgba(255,255,255,0.06);}
+.vision-img{display:block;max-width:100%;max-height:calc(100dvh - 230px);width:auto;height:auto;
+  object-fit:contain;border-radius:20px;
+  border:0.5px solid var(--hair);
+  box-shadow:0 14px 50px rgba(10,30,60,.45),0 0 0 1px rgba(255,255,255,0.04) inset;
+  opacity:0;transform:translateY(18px) scale(.96);
+  transition:opacity .6s var(--ease),transform .7s cubic-bezier(.32,.72,0,1);}
+.vision-wrap.in-view .vision-img{opacity:1;transform:none;}
+
+/* vision-hint — minimal centered glass card */
+.vision-hint{margin-top:32px;display:flex;justify-content:center;align-items:center;padding:8px 0 20px;
+  opacity:0;transform:translateY(8px);
+  transition:opacity .35s var(--ease),transform .35s var(--ease);}
+.vision-hint.show{opacity:1;transform:none;pointer-events:auto;}
+.vision-hint[hidden]{display:none;}
+.vh-card{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:24px 20px 22px;border-radius:22px;cursor:pointer;font-family:inherit;text-align:center;
+  background:linear-gradient(180deg,rgba(38,38,42,0.6),rgba(22,22,26,0.6));
+  border:0.5px solid rgba(255,255,255,0.08);
+  backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+  box-shadow:0 8px 28px rgba(0,0,0,.35),inset 0 0.5px 0 rgba(255,255,255,0.06);
+  color:var(--text);min-height:140px;
+  transition:transform .2s var(--ease),box-shadow .25s,border-color .25s;}
+.vh-card:active{transform:scale(.985);}
+.vh-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--teal);}
+.vh-headline{font-size:17px;font-weight:600;letter-spacing:-0.4px;color:var(--text);line-height:1.2;}
+.vh-cta{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;margin-top:4px;
+  background:linear-gradient(180deg,#3398ff,#0a78ee);color:#fff;
+  box-shadow:0 6px 18px rgba(10,132,255,.45),inset 0 0.5px 0 rgba(255,255,255,0.28);
+  animation:vhBounce 1.8s cubic-bezier(.32,.72,0,1) infinite;}
+.vh-cta svg{width:22px;height:22px;}
+@keyframes vhBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(6px);}}
+@media (prefers-reduced-motion:reduce){
+  .vh-cta{animation:none;}
+  .vision-img{transition:opacity .25s;transform:none;}
+}
 .vision-actions{display:flex;align-items:center;justify-content:center;margin-top:14px;}
 .vision-link{background:none;border:none;color:var(--text-3);font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:-0.1px;
   padding:6px 10px;cursor:pointer;border-radius:8px;
@@ -935,6 +966,15 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
       <ul class="g-list" id="goalList"></ul>
     </div>
 
+    <div class="vision-hint" id="visionHint" hidden>
+      <button class="vh-card" id="vhCta" type="button">
+        <div class="vh-eyebrow">Vision Board</div>
+        <div class="vh-headline">Swipe up to reveal</div>
+        <div class="vh-cta">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></svg>
+        </div>
+      </button>
+    </div>
     <div class="vision-wrap" id="visionWrap" hidden>
       <img class="vision-img" id="visionImg" alt="Vision board">
     </div>
@@ -2090,8 +2130,69 @@ document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:f
 function _visionShow(dataUrl){
   var wrap=document.getElementById('visionWrap'),img=document.getElementById('visionImg');
   var add=document.getElementById('visionAddBtn'),edit=document.getElementById('visionEdit');
-  if(dataUrl){img.src=dataUrl;wrap.hidden=false;add.classList.add('hidden');edit.classList.remove('hidden');}
-  else{img.removeAttribute('src');wrap.hidden=true;add.classList.remove('hidden');edit.classList.add('hidden');}
+  var hint=document.getElementById('visionHint');
+  if(dataUrl){
+    img.src=dataUrl;wrap.hidden=false;add.classList.add('hidden');edit.classList.remove('hidden');
+    if(hint){hint.hidden=false;requestAnimationFrame(function(){hint.classList.add('show');});}
+    _visionObserve();
+  }else{
+    img.removeAttribute('src');wrap.hidden=true;wrap.classList.remove('in-view');
+    add.classList.remove('hidden');edit.classList.add('hidden');
+    if(hint){hint.classList.remove('show');hint.hidden=true;}
+  }
+}
+var _visionBound=false,_visionScrolling=false,_visionTimer=null,_visionTouchSt=0,_visionIO=null;
+function _visionObserve(){
+  var view=document.getElementById('timerView'),wrap=document.getElementById('visionWrap');
+  if(!view||!wrap)return;
+  // visual state observer (in-view + hint toggle)
+  if(!_visionIO&&'IntersectionObserver' in window){
+    _visionIO=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        var inView=e.intersectionRatio>=0.55;
+        wrap.classList.toggle('in-view',inView);
+        var hint=document.getElementById('visionHint');
+        if(hint)hint.classList.toggle('show',!inView&&!wrap.hidden);
+      });
+    },{root:view,threshold:[0,0.3,0.55,0.8,1]});
+    _visionIO.observe(wrap);
+  }
+  if(_visionBound)return;_visionBound=true;
+  function points(){
+    var vH=view.clientHeight;
+    var vRect=view.getBoundingClientRect();
+    var wRect=wrap.getBoundingClientRect();
+    var wTop=wRect.top-vRect.top+view.scrollTop;
+    var P2=wTop;
+    var hint=document.getElementById('visionHint');
+    var hTop=wTop-120,hH=80;
+    if(hint){var hRect=hint.getBoundingClientRect();hTop=hRect.top-vRect.top+view.scrollTop;hH=hint.offsetHeight;}
+    var P1=Math.max(0,hTop+hH-vH+60);
+    if(P1>=P2-20)P1=Math.max(0,P2-vH+80);
+    return {P1:P1,P2:P2};
+  }
+  function decide(){
+    if(wrap.hidden||_visionScrolling)return;
+    var st=view.scrollTop;
+    var p=points();
+    if(st<=p.P1+10)return;       // above hint → free
+    if(st>=p.P2-10)return;       // at/past wrap → free for content below
+    // strict binary: direction from gesture
+    var dir=st>=_visionTouchSt?'down':'up';
+    var target=(dir==='down')?p.P2:p.P1;
+    _visionScrolling=true;
+    view.scrollTo({top:target,behavior:'smooth'});
+    setTimeout(function(){_visionScrolling=false;},650);
+  }
+  view.addEventListener('touchstart',function(){_visionTouchSt=view.scrollTop;},{passive:true});
+  view.addEventListener('touchend',function(){clearTimeout(_visionTimer);_visionTimer=setTimeout(decide,100);},{passive:true});
+  view.addEventListener('wheel',function(){_visionTouchSt=view.scrollTop;clearTimeout(_visionTimer);_visionTimer=setTimeout(decide,180);},{passive:true});
+  // CTA tap → snap directly to wrap
+  var cta=document.getElementById('vhCta');
+  if(cta)cta.onclick=function(){
+    var p=points();_visionScrolling=true;view.scrollTo({top:p.P2,behavior:'smooth'});
+    setTimeout(function(){_visionScrolling=false;},700);
+  };
 }
 function _visionPick(){document.getElementById('visionFile').click();}
 (function(){
