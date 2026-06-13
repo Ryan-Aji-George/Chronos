@@ -1445,7 +1445,6 @@ function renderHabitManage(){
   const wrap=document.getElementById('habitManage');wrap.innerHTML='';
   document.getElementById('habitCountChip').textContent=habits.length;
   // keep the manage panel open when there are no habits, so the add field is reachable
-  if(!habits.length&&_collapse['managePanel'])_collapse['managePanel'].set(true);
   habits.forEach((h,idx)=>{
     const row=document.createElement('div');row.className='hm-row';row.dataset.id=h.id;row.draggable=true;
     row.innerHTML=
@@ -1677,7 +1676,7 @@ function wireCollapse(btnId,panelId,openByDefault){
 }
 wireCollapse('filterToggle','filterPanel',false);
 // Manage panel: open by default when there are no habits yet (so the add field is reachable)
-wireCollapse('manageToggle','managePanel', !(habits&&habits.length));
+wireCollapse('manageToggle','managePanel', false);
 document.getElementById('hpPrev').onclick=()=>{if(_hPage>0){_hPage--;renderHabitTable();document.getElementById('habitTableWrap').scrollIntoView({behavior:'smooth',block:'nearest'});}};
 document.getElementById('hpNext').onclick=()=>{if(_hPage<habitPageCount()-1){_hPage++;renderHabitTable();document.getElementById('habitTableWrap').scrollIntoView({behavior:'smooth',block:'nearest'});}};
 const habitSearch=document.getElementById('habitSearch'),habitSearchClear=document.getElementById('habitSearchClear');
