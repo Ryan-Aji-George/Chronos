@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -29,6 +29,17 @@
   --ease:cubic-bezier(.32,.72,0,1);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+/* lock UI text from selection / pinch zoom; inputs stay editable */
+html,body{touch-action:manipulation;-ms-content-zooming:none;}
+body,.header,.clock,.brand,.nm,.time,.cs,.pill,.hint,.tab,.tabs,.tabbar,.c-title,.chip,
+.btn-main,.btn-circ,.icon-btn,.add,.tab,.filt,.pg-btn,.collapse-toggle,.day-card,.day-name,.day-stats,
+.stat,.stat .l,.stat .v,.s-hd,.today-title,.today-sub,.trc-pct,.heat-legend,.tdy-badge,
+.habit-chip,.hs-box,.hg-name,.hg-axis-cell,.hg-foot,.reset-row,.toast,.install,
+.empty,.sheet h2,.sheet .sub,.sheet-sec,.grab,.hg-range,.hist-meta{
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+/* text containers stay selectable */
+input,textarea,.notes,.gt,.ntxt,.hm-name,.g-item .txt,.sheet-notes{
+  user-select:text;-webkit-user-select:text;-webkit-touch-callout:default;}
 html,body{height:100%;}
 body{
   background:var(--bg);color:var(--text);
@@ -240,6 +251,39 @@ body{
   cursor:pointer;display:grid;place-items:center;flex:none;transition:background .15s,color .15s;}
 .g-act:active{background:var(--card-2);}.g-act.del:active{color:#ff453a;}.g-act svg{width:18px;height:18px;}
 .empty{color:var(--text-3);font-size:14px;text-align:center;padding:20px 0;}
+.goal-more{margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;
+  border:0.5px solid var(--hair);
+  background:linear-gradient(180deg,rgba(50,50,54,0.5),rgba(36,36,40,0.5));
+  color:var(--text-2);font-family:inherit;font-weight:600;font-size:13px;letter-spacing:-0.1px;
+  padding:11px 14px;border-radius:13px;cursor:pointer;min-height:44px;
+  backdrop-filter:blur(14px);
+  box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.05);
+  transition:background .2s,color .2s,transform .12s var(--ease),border-color .2s;}
+.goal-more:active{transform:scale(.97);}
+.goal-more:hover{color:var(--text);border-color:var(--hair-strong);}
+.goal-more svg{width:15px;height:15px;transition:transform .3s var(--ease);}
+.goal-more.open svg{transform:rotate(180deg);}
+
+/* vision board */
+#timerView{scroll-snap-type:y proximity;scroll-padding-top:0;}
+.vision-wrap{margin-top:18px;display:flex;align-items:center;justify-content:center;
+  scroll-snap-align:start;scroll-snap-stop:always;padding:0;
+  min-height:calc(100dvh - 208px);}
+.vision-wrap[hidden]{display:none;}
+.vision-img{display:block;max-width:100%;max-height:calc(100dvh - 220px);width:auto;height:auto;
+  object-fit:contain;border-radius:18px;
+  border:0.5px solid var(--hair);box-shadow:0 10px 36px rgba(0,0,0,.45),inset 0 0.5px 0 rgba(255,255,255,0.06);}
+.vision-actions{display:flex;align-items:center;justify-content:center;margin-top:14px;}
+.vision-link{background:none;border:none;color:var(--text-3);font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:-0.1px;
+  padding:6px 10px;cursor:pointer;border-radius:8px;
+  transition:color .2s,background .15s;}
+.vision-link:hover{color:var(--text-2);}
+.vision-link:active{background:rgba(255,255,255,0.04);}
+.vision-link.danger{color:#ff6b62;}
+.vision-link.danger:hover{color:#ff453a;}
+.vision-sep{color:var(--text-3);font-size:12px;margin:0 4px;opacity:.6;}
+.vision-edit{display:flex;align-items:center;gap:2px;}
+.vision-edit.hidden{display:none;}
 
 /* notes */
 .notes{width:100%;min-height:110px;
@@ -627,6 +671,48 @@ body{
 .tab.active{color:#fff;}
 
 
+/* in-app modal (confirm + prompt) */
+.modal-bg{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  opacity:0;pointer-events:none;transition:opacity .25s var(--ease);}
+.modal-bg.on{opacity:1;pointer-events:auto;}
+.modal{position:fixed;left:50%;top:50%;z-index:81;
+  background:linear-gradient(180deg,rgba(40,40,44,0.92),rgba(22,22,26,0.92));
+  border:0.5px solid var(--hair-strong);border-radius:22px;
+  padding:24px 22px 20px;width:min(92vw,380px);
+  box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 0.5px 0 rgba(255,255,255,0.08);
+  backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);
+  transform:translate(-50%,-50%) scale(.92);opacity:0;pointer-events:none;
+  transition:transform .3s cubic-bezier(.5,1.55,.42,1),opacity .22s var(--ease);}
+.modal.on{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto;}
+.modal-icon{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;margin:0 auto 14px;
+  background:linear-gradient(180deg,rgba(10,132,255,0.22),rgba(10,132,255,0.08));
+  border:0.5px solid rgba(10,132,255,0.3);
+  color:var(--teal);box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.15);}
+.modal-icon svg{width:26px;height:26px;}
+.modal.danger .modal-icon{background:linear-gradient(180deg,rgba(255,69,58,0.24),rgba(255,69,58,0.08));
+  border-color:rgba(255,69,58,0.32);color:#ff6b62;}
+.modal-title{font-size:19px;font-weight:700;letter-spacing:-0.5px;text-align:center;margin-bottom:8px;color:var(--text);}
+.modal-body{font-size:14px;color:var(--text-2);text-align:center;line-height:1.5;margin-bottom:18px;white-space:pre-line;}
+.modal-body:empty{display:none;}
+.modal-input{width:100%;background:linear-gradient(180deg,rgba(20,20,22,0.7),rgba(10,10,12,0.7));
+  border:0.5px solid var(--hair);border-radius:13px;
+  padding:13px 15px;color:var(--text);font-family:inherit;font-size:16px;outline:none;margin-bottom:18px;
+  box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.04);
+  transition:border-color .2s,box-shadow .2s;}
+.modal-input:focus{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-dim);}
+.modal-input.hidden{display:none;}
+.modal-acts{display:flex;gap:10px;}
+.modal-btn{flex:1;min-height:48px;border:none;border-radius:14px;font-family:inherit;font-weight:600;font-size:15px;
+  letter-spacing:-0.2px;cursor:pointer;transition:transform .12s var(--ease),filter .2s,background .2s,box-shadow .2s;}
+.modal-btn:active{transform:scale(.96);}
+.modal-btn.cancel{background:linear-gradient(180deg,rgba(60,60,64,0.6),rgba(44,44,46,0.6));color:var(--text);
+  border:0.5px solid var(--hair);box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.06);}
+.modal-btn.cancel:active{background:rgba(40,40,44,0.7);}
+.modal-btn.ok{background:linear-gradient(180deg,#3398ff,#0a78ee);color:#fff;
+  box-shadow:0 4px 14px rgba(10,132,255,.45),inset 0 0.5px 0 rgba(255,255,255,0.25);}
+.modal-btn.ok.danger{background:linear-gradient(180deg,#ff5b51,#e0392e);
+  box-shadow:0 4px 14px rgba(255,69,58,.45),inset 0 0.5px 0 rgba(255,255,255,0.25);}
+
 /* toast + install */
 .toast{position:fixed;bottom:150px;left:50%;transform:translateX(-50%) translateY(12px);z-index:90;
   background:rgba(44,44,46,0.95);border:0.5px solid var(--hair);color:var(--text);padding:12px 20px;border-radius:14px;
@@ -792,6 +878,19 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
       </div>
       <ul class="g-list" id="goalList"></ul>
     </div>
+
+    <div class="vision-wrap" id="visionWrap" hidden>
+      <img class="vision-img" id="visionImg" alt="Vision board">
+    </div>
+    <div class="vision-actions">
+      <button class="vision-link" id="visionAddBtn">+ Add vision board</button>
+      <div class="vision-edit hidden" id="visionEdit">
+        <button class="vision-link" id="visionChangeBtn">Change vision board</button>
+        <span class="vision-sep">·</span>
+        <button class="vision-link danger" id="visionRemoveBtn">Remove vision board</button>
+      </div>
+    </div>
+    <input type="file" id="visionFile" accept="image/*" style="display:none">
   </div>
 
   <!-- STATS -->
@@ -995,6 +1094,19 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
   <button class="ib no" id="installNo">Later</button>
 </div>
 
+<!-- in-app modal (confirm + prompt) -->
+<div class="modal-bg" id="modalBg"></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="modal-icon" id="modalIcon"></div>
+  <h3 class="modal-title" id="modalTitle">—</h3>
+  <p class="modal-body" id="modalBody"></p>
+  <input class="modal-input hidden" id="modalInput" maxlength="200">
+  <div class="modal-acts">
+    <button class="modal-btn cancel" id="modalCancel">Cancel</button>
+    <button class="modal-btn ok" id="modalOk">OK</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1105,19 +1217,19 @@ function syncUI(){const run=state.running;const label=run?'Pause':(state.elapsed
 
 /* ---------- controls ---------- */
 function toggle(){if(state.running){state.elapsed=currentMs();state.running=false;save();}else{state.startTs=performance.now();state.running=true;}syncUI();}
-function reset(){if(!confirm("Reset today's timer to 0?\nGoals and notes are kept."))return;state.elapsed=0;state.running=false;state.startTs=0;save();syncUI();render();toast('Timer reset');}
+async function reset(){if(!(await appConfirm({title:"Reset timer?",body:"Today's timer goes back to 0:00:00. Goals and notes stay.",okText:'Reset',danger:true})))return;state.elapsed=0;state.running=false;state.startTs=0;save();syncUI();render();toast('Timer reset');}
 document.getElementById('playBtn').onclick=toggle;
 document.getElementById('resetBtn').onclick=reset;
 
 /* ---------- stats: data management ---------- */
 document.getElementById('resetTodayBtn').onclick=async()=>{
-  if(!confirm("Reset Today?\n\nThis clears today's timer and today's goals. History, notes, and other days are kept."))return;
+  if(!(await appConfirm({title:'Reset today?',body:"This clears today's timer and goals. History, notes, and other days are kept.",okText:'Reset',danger:true})))return;
   state.elapsed=0;state.running=false;state.startTs=0;state.goals=[];
   await save();syncUI();render();renderGoals();buildStats();toast('Today reset');
 };
 document.getElementById('factoryResetBtn').onclick=async()=>{
-  if(!confirm("Factory Reset?\n\nThis permanently erases ALL data — every day's timer and goals, your notes, your habits and all habit history, and settings. This cannot be undone."))return;
-  if(!confirm("Are you absolutely sure? This is your last chance — everything will be deleted."))return;
+  if(!(await appConfirm({title:'Factory reset?',body:"Permanently erases EVERYTHING — timers, goals, notes, habits, habit history, settings. Cannot be undone.",okText:'Continue',danger:true})))return;
+  if(!(await appConfirm({title:'Are you sure?',body:'Last chance. All data will be deleted.',okText:'Delete all',danger:true})))return;
   await wipeAll();
   // reset in-memory state
   state.date=todayKey();state.elapsed=0;state.running=false;state.startTs=0;state.goals=[];
@@ -1127,6 +1239,7 @@ document.getElementById('factoryResetBtn').onclick=async()=>{
   const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
   try{localStorage.removeItem('chronos_inst');}catch(e){}
   await loadDay();await kvPut('notes','');
+  try{_visionShow(null);}catch(e){}
   syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();toast('Everything reset');
 };
 
@@ -1136,15 +1249,18 @@ async function buildBackup(){
   const days=await dbAll();
   const dayMap={};days.forEach(d=>dayMap[d.date]=d);
   dayMap[state.date]={date:state.date,elapsed:currentMs(),goals:state.goals};
+  let visionBoard=null;
+  try{visionBoard=await kvGet('visionBoard');}catch(e){}
   return {
     app:'Chronos',
     type:'chronos-backup',
-    version:1,
+    version:2,
     exportedAt:new Date().toISOString(),
     days:Object.values(dayMap),
     notes:globalNotes,
     habits:habits,
-    habitLog:habitLog
+    habitLog:habitLog,
+    visionBoard:visionBoard||null
   };
 }
 document.getElementById('exportBtn').onclick=async()=>{
@@ -1168,7 +1284,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
   try{parsed=JSON.parse(await file.text());}catch(e){toast('Invalid JSON file');return;}
   if(!parsed||parsed.type!=='chronos-backup'||!Array.isArray(parsed.days)){toast('Not a Chronos backup');return;}
   const dayCount=parsed.days.length, habitCount=Array.isArray(parsed.habits)?parsed.habits.length:0;
-  if(!confirm('Import this backup?\n\n'+dayCount+' day(s), '+habitCount+' habit(s).\n\nThis REPLACES all current data — timer history, goals, notes, and habits. Consider exporting first.'))return;
+  if(!(await appConfirm({title:'Import backup?',body:dayCount+' day(s), '+habitCount+' habit(s).\nThis REPLACES all current data — timer history, goals, notes, habits. Consider exporting first.',okText:'Import',danger:true})))return;
   try{
     await wipeAll();
     // write days
@@ -1177,6 +1293,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
     await kvPut('notes',typeof parsed.notes==='string'?parsed.notes:'');
     await kvPut('habits',Array.isArray(parsed.habits)?parsed.habits:[]);
     await kvPut('habitLog',(parsed.habitLog&&typeof parsed.habitLog==='object')?parsed.habitLog:{});
+    await kvPut('visionBoard',(typeof parsed.visionBoard==='string'&&parsed.visionBoard)?parsed.visionBoard:null);
     // refresh in-memory state
     await loadDay();
     globalNotes=(await kvGet('notes'))||'';
@@ -1185,6 +1302,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
     _hPage=0;_hQuery='';_hFilter='all';
     const hs=document.getElementById('habitSearch');if(hs)hs.value='';
     const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
+    try{var _vb=await kvGet('visionBoard');_visionShow(_vb||null);}catch(e){}
     syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();
     toast('Backup imported');
   }catch(e){toast('Import failed');}
@@ -1195,17 +1313,39 @@ async function rollIfNeeded(){if(todayKey()!==state.date){state.elapsed=currentM
 setInterval(rollIfNeeded,15000);
 
 /* ---------- goals ---------- */
-function renderGoals(){['goalList','goalList2'].forEach(id=>{const ul=document.getElementById(id);ul.innerHTML='';
-  if(!state.goals.length){ul.innerHTML='<div class="empty">No goals logged yet</div>';return;}state.goals.forEach(g=>ul.appendChild(goalEl(g)));});
-  const done=state.goals.filter(g=>g.done).length;
-  document.getElementById('goalChip').textContent=state.goals.length;document.getElementById('goalChip2').textContent=state.goals.length;
-  if(!document.getElementById('statsView').classList.contains('hidden'))liveStats();}
+var _goalsExpanded=false;
+function renderGoals(){
+  ['goalList','goalList2'].forEach(function(id){
+    var ul=document.getElementById(id);ul.innerHTML='';
+    if(!state.goals.length){ul.innerHTML='<div class="empty">No goals logged yet</div>';return;}
+    var collapse=(id==='goalList' && state.goals.length>5 && !_goalsExpanded);
+    var items=collapse?state.goals.slice(0,5):state.goals;
+    items.forEach(function(g){ul.appendChild(goalEl(g));});
+    if(collapse){
+      var hidden=state.goals.length-5;
+      var btn=document.createElement('button');
+      btn.type='button';btn.className='goal-more';
+      btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg> Show all ('+hidden+' more)';
+      btn.onclick=function(){_goalsExpanded=true;renderGoals();};
+      ul.appendChild(btn);
+    }else if(id==='goalList' && state.goals.length>5 && _goalsExpanded){
+      var btn2=document.createElement('button');
+      btn2.type='button';btn2.className='goal-more open';
+      btn2.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg> Show less';
+      btn2.onclick=function(){_goalsExpanded=false;renderGoals();};
+      ul.appendChild(btn2);
+    }
+  });
+  document.getElementById('goalChip').textContent=state.goals.length;
+  document.getElementById('goalChip2').textContent=state.goals.length;
+  if(!document.getElementById('statsView').classList.contains('hidden'))liveStats();
+}
 function goalEl(g){const li=document.createElement('li');li.className='g-item'+(g.done?' done':'');
   const c=document.createElement('div');c.className='check'+(g.done?' on':'');c.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   c.onclick=()=>{g.done=!g.done;save();renderGoals();};
   const t=document.createElement('div');t.className='txt';t.textContent=g.text;
   const e=document.createElement('button');e.className='g-act';e.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>';
-  e.onclick=()=>{const v=prompt('Edit goal:',g.text);if(v!==null&&v.trim()){g.text=v.trim();save();renderGoals();}};
+  e.onclick=async()=>{const v=await appPrompt({title:'Edit goal',value:g.text,placeholder:'Goal text'});if(v){g.text=v;save();renderGoals();}};
   const d=document.createElement('button');d.className='g-act del';d.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
   d.onclick=()=>{state.goals=state.goals.filter(x=>x.id!==g.id);save();renderGoals();};
   li.append(c,t,e,d);return li;}
@@ -1401,12 +1541,12 @@ async function addHabit(){
 }
 async function editHabit(id){
   const h=habitById(id);if(!h)return;
-  const v=prompt('Edit habit name:',h.name);
-  if(v!==null&&v.trim()){h.name=v.trim();await saveHabits();renderHabitsAll();}
+  const v=await appPrompt({title:'Edit habit',value:h.name,placeholder:'Habit name'});
+  if(v){h.name=v;await saveHabits();renderHabitsAll();}
 }
 async function deleteHabit(id){
   const h=habitById(id);if(!h)return;
-  if(!confirm('Delete habit "'+h.name+'"?\nIts check history will also be removed.'))return;
+  if(!(await appConfirm({title:'Delete habit?',body:'"'+h.name+'"\nIts check history will also be removed.',okText:'Delete',danger:true})))return;
   habits=habits.filter(x=>x.id!==id);
   // purge from log
   Object.keys(habitLog).forEach(d=>{if(habitLog[d]){delete habitLog[d][id];if(!Object.keys(habitLog[d]).length)delete habitLog[d];}});
@@ -1684,7 +1824,7 @@ habitSearch.addEventListener('input',()=>{_hQuery=habitSearch.value;_hPage=0;hab
 habitSearchClear.onclick=()=>{habitSearch.value='';_hQuery='';_hPage=0;habitSearchClear.classList.add('hide');renderHabitTable();habitSearch.focus();};
 document.getElementById('clearHabitsBtn').onclick=async()=>{
   if(!habits.length&&!Object.keys(habitLog).length){toast('Nothing to clear');return;}
-  if(!confirm('Clear ALL habit data?\n\nThis deletes every habit and its entire check history. This cannot be undone.'))return;
+  if(!(await appConfirm({title:'Clear all habit data?',body:'Deletes every habit and its entire check history. Cannot be undone.',okText:'Clear',danger:true})))return;
   habits=[];habitLog={};_hPage=0;_hQuery='';_hFilter='all';
   document.getElementById('habitSearch').value='';document.getElementById('habitSearchClear').classList.add('hide');
   await saveHabits();await saveHabitLog();renderHabitsAll();toast('Habit data cleared');
@@ -1796,11 +1936,103 @@ function openWeekGoals(){
   var btn=document.getElementById('sWkGoalsBtn');if(btn)btn.onclick=openWeekGoals;
 })();
 
+/* in-app confirm + prompt (replaces native browser dialogs) */
+(function(){
+  var bg=document.getElementById('modalBg'),m=document.getElementById('modal');
+  var titleEl=document.getElementById('modalTitle'),bodyEl=document.getElementById('modalBody');
+  var inputEl=document.getElementById('modalInput'),iconEl=document.getElementById('modalIcon');
+  var okEl=document.getElementById('modalOk'),cancelEl=document.getElementById('modalCancel');
+  var _resolver=null,_kind=null;
+  var ICONS={
+    question:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg>',
+    warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+    edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>'
+  };
+  function close(val){
+    bg.classList.remove('on');m.classList.remove('on');
+    var r=_resolver;_resolver=null;
+    setTimeout(function(){if(r)r(val);},120);
+  }
+  bg.onclick=function(){if(_kind==='confirm')close(false);else close(null);};
+  cancelEl.onclick=function(){if(_kind==='confirm')close(false);else close(null);};
+  okEl.onclick=function(){
+    if(_kind==='prompt'){var v=inputEl.value.trim();close(v.length?v:null);}
+    else close(true);
+  };
+  inputEl.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();okEl.click();}});
+  document.addEventListener('keydown',function(e){if(!m.classList.contains('on'))return;
+    if(e.key==='Escape'){e.preventDefault();cancelEl.click();}});
+  window.appConfirm=function(opts){
+    opts=opts||{};_kind='confirm';
+    iconEl.innerHTML=ICONS[opts.icon||(opts.danger?'warn':'question')];
+    titleEl.textContent=opts.title||'Confirm';
+    bodyEl.textContent=opts.body||'';
+    inputEl.classList.add('hidden');inputEl.value='';
+    okEl.textContent=opts.okText||(opts.danger?'Delete':'OK');
+    cancelEl.textContent=opts.cancelText||'Cancel';
+    okEl.classList.toggle('danger',!!opts.danger);
+    m.classList.toggle('danger',!!opts.danger);
+    bg.classList.add('on');m.classList.add('on');
+    return new Promise(function(res){_resolver=res;});
+  };
+  window.appPrompt=function(opts){
+    opts=opts||{};_kind='prompt';
+    iconEl.innerHTML=ICONS[opts.icon||'edit'];
+    titleEl.textContent=opts.title||'Edit';
+    bodyEl.textContent=opts.body||'';
+    inputEl.classList.remove('hidden');inputEl.value=opts.value||'';inputEl.placeholder=opts.placeholder||'';
+    okEl.textContent=opts.okText||'Save';
+    cancelEl.textContent=opts.cancelText||'Cancel';
+    okEl.classList.remove('danger');m.classList.remove('danger');
+    bg.classList.add('on');m.classList.add('on');
+    setTimeout(function(){inputEl.focus();inputEl.select();},120);
+    return new Promise(function(res){_resolver=res;});
+  };
+})();
+
+/* prevent multi-touch pinch zoom + gesture zoom (iOS Safari) */
+document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
+document.addEventListener('gesturestart',function(e){e.preventDefault();});
+document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false});
+
+/* ---------- vision board ---------- */
+function _visionShow(dataUrl){
+  var wrap=document.getElementById('visionWrap'),img=document.getElementById('visionImg');
+  var add=document.getElementById('visionAddBtn'),edit=document.getElementById('visionEdit');
+  if(dataUrl){img.src=dataUrl;wrap.hidden=false;add.classList.add('hidden');edit.classList.remove('hidden');}
+  else{img.removeAttribute('src');wrap.hidden=true;add.classList.remove('hidden');edit.classList.add('hidden');}
+}
+function _visionPick(){document.getElementById('visionFile').click();}
+(function(){
+  var fileEl=document.getElementById('visionFile');
+  document.getElementById('visionAddBtn').onclick=_visionPick;
+  document.getElementById('visionChangeBtn').onclick=_visionPick;
+  document.getElementById('visionRemoveBtn').onclick=async function(){
+    if(!(await appConfirm({title:'Remove vision board?',body:'Image will be deleted from this device.',okText:'Remove',danger:true})))return;
+    try{await kvPut('visionBoard',null);}catch(e){}
+    _visionShow(null);toast('Vision board removed');
+  };
+  fileEl.onchange=function(ev){
+    var f=ev.target.files&&ev.target.files[0];if(!f){return;}
+    if(!/^image\//.test(f.type)){toast('Pick an image');return;}
+    var reader=new FileReader();
+    reader.onload=async function(){
+      var url=reader.result;
+      try{await kvPut('visionBoard',url);}catch(e){toast('Save failed');return;}
+      _visionShow(url);toast('Vision board saved');
+    };
+    reader.onerror=function(){toast('Read failed');};
+    reader.readAsDataURL(f);
+    fileEl.value='';
+  };
+})();
+
 /* ---------- boot ---------- */
 (async function(){
   await openDB();
   try{await loadDay();}catch(e){}
   try{globalNotes=(await kvGet('notes'))||'';}catch(e){globalNotes='';}
+  try{var vb=await kvGet('visionBoard');if(vb)_visionShow(vb);}catch(e){}
   try{await loadHabits();}catch(e){habits=[];habitLog={};}
   syncUI();renderGoals();renderNotes();render();tick();renderHabitsAll();})();
 </script>
