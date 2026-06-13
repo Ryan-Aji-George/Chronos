@@ -59,6 +59,7 @@ body{
 @keyframes drift2{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(50px,-40px) scale(1.1);}}
 @media (prefers-reduced-motion:reduce){.ambient::before,.ambient::after{animation:none;}}
 
+
 .app{position:relative;z-index:1;height:100dvh;display:flex;flex-direction:column;
   max-width:600px;margin:0 auto;}
 
@@ -111,6 +112,67 @@ body{
   background:radial-gradient(circle at 50% 38%,rgba(10,132,255,0.12),transparent 60%);
   pointer-events:none;}
 @keyframes spin{to{transform:scale(1) rotate(360deg);}}
+
+/* dial running — orbital blobs + swirl behind ring (Kepler-like physics) */
+.dial-fx{position:absolute;inset:-25%;display:block;pointer-events:none;
+  opacity:0;transition:opacity 1s var(--ease);z-index:-1;}
+.dial.running .dial-fx{opacity:1;animation:fxDrift 60s linear infinite;}
+@keyframes fxDrift{to{transform:rotate(360deg);}}
+/* gravitational swirl behind blobs */
+.dial-swirl{position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,
+    rgba(10,77,153,.18),transparent 22%,
+    rgba(138,74,0,.16),transparent 42%,
+    rgba(138,54,84,.18),transparent 62%,
+    rgba(94,42,140,.18),transparent 82%,
+    rgba(21,95,46,.16),transparent 100%);
+  filter:blur(28px);opacity:0;
+  transition:opacity 1.2s;}
+.dial.running .dial-swirl{opacity:1;animation:swirlSpin 28s linear infinite;}
+@keyframes swirlSpin{to{transform:rotate(-360deg);}}
+/* blobs with radial gradient (depth) */
+.dial-fx .blob{position:absolute;top:50%;left:50%;width:150px;height:150px;border-radius:50%;
+  margin:-75px;filter:blur(44px);opacity:.4;will-change:transform,offset-distance;
+  offset-rotate:0deg;
+  background:radial-gradient(circle at 35% 30%,var(--c-hi,#1a5cb0),var(--c,#0a4d99) 65%,transparent 95%);}
+.dial.running .dial-fx .blob{
+  animation:
+    flow var(--d,14s) cubic-bezier(.5,.05,.5,.95) infinite,
+    breath var(--bd,6s) ease-in-out infinite;
+  animation-delay:var(--ad,0s),0s;}
+/* dark variants of stats overview palette: blue / orange / pink / purple / green */
+.dial-fx .b1{--c:#0a4d99;--c-hi:#1f6fc4;--d:13s;--bd:5.5s;--ad:0s;
+  offset-path:path('M-90,0 A90,52 0 1,0 90,0 A90,52 0 1,0 -90,0');}
+.dial-fx .b2{--c:#8a4a00;--c-hi:#c46d12;--d:17s;--bd:7s;--ad:-3s;
+  offset-path:path('M-78,-45 A92,52 30 1,0 78,45 A92,52 30 1,0 -78,-45');}
+.dial-fx .b3{--c:#8a3654;--c-hi:#c45078;--d:15s;--bd:6s;--ad:-6s;
+  offset-path:path('M-75,45 A84,55 -28 1,0 75,-45 A84,55 -28 1,0 -75,45');}
+.dial-fx .b4{--c:#5e2a8c;--c-hi:#8a45c4;--d:21s;--bd:8s;--ad:-2s;
+  offset-path:path('M0,0 C75,-92 -75,-92 0,0 C75,92 -75,92 0,0');}
+.dial-fx .b5{--c:#155f2e;--c-hi:#28944c;--d:16s;--bd:5s;--ad:-9s;
+  offset-path:path('M-100,0 C-66,-78 66,-78 100,0 C66,78 -66,78 -100,0');}
+.dial-fx .b6{--c:#0a4d99;--c-hi:#1f6fc4;--d:19s;--bd:6.5s;--ad:-4s;
+  offset-path:path('M0,-96 A96,66 60 1,1 0,96 A96,66 60 1,1 0,-96');}
+.dial-fx .b7{--c:#5e2a8c;--c-hi:#8a45c4;--d:23s;--bd:7.5s;--ad:-7s;
+  offset-path:path('M-108,25 C-42,-84 42,-84 108,25 C42,116 -42,116 -108,25');}
+@keyframes flow{from{offset-distance:0%;}to{offset-distance:100%;}}
+@keyframes breath{
+  0%,100%{transform:scale(1);opacity:.65;}
+  50%{transform:scale(1.18);opacity:.85;}
+}
+@supports not (offset-path:path('M0,0')){
+  .dial-fx .blob{offset-path:none;}
+  .dial.running .dial-fx .blob{animation:fallbackOrb var(--d,14s) linear infinite;}
+  .dial-fx .b1{--r:90px;}.dial-fx .b2{--r:110px;}.dial-fx .b3{--r:80px;}
+  .dial-fx .b4{--r:130px;}.dial-fx .b5{--r:100px;}.dial-fx .b6{--r:115px;}.dial-fx .b7{--r:95px;}
+  @keyframes fallbackOrb{
+    from{transform:rotate(0deg) translateX(var(--r,90px)) rotate(0deg);}
+    to{transform:rotate(360deg) translateX(var(--r,90px)) rotate(-360deg);}
+  }
+}
+.dial.running::before{opacity:.18;}
+@media (prefers-reduced-motion:reduce){.dial-fx .blob{animation:none;}}
+
 .dial svg.ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);overflow:visible;z-index:1;}
 .ring-track{fill:none;stroke:rgba(255,255,255,0.07);stroke-width:3;}
 .ring-prog{fill:none;stroke:url(#grad);stroke-width:8;stroke-linecap:round;
@@ -676,6 +738,7 @@ body{
 .tab.active{color:#fff;}
 
 
+
 /* passcode lock */
 html.locked .app,html.locked .tabbar,html.locked .install,html.locked .toast,
 html.locked .sheet,html.locked .sheet-bg,html.locked .modal,html.locked .modal-bg{display:none!important;}
@@ -685,30 +748,47 @@ html.locked .ambient{opacity:.4;}
   padding:24px;}
 html.locked .lock{display:flex;}
 .lock-ambient{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
-.lock-ambient::before,.lock-ambient::after{content:"";position:absolute;border-radius:50%;filter:blur(110px);}
-.lock-ambient::before{width:380px;height:380px;background:#0a84ff;top:-120px;left:-100px;opacity:.18;animation:drift1 40s ease-in-out infinite;}
-.lock-ambient::after{width:320px;height:320px;background:#5e5ce6;bottom:-120px;right:-100px;opacity:.14;animation:drift2 46s ease-in-out infinite;}
-.lock-card{position:relative;z-index:1;width:min(92vw,380px);
-  background:linear-gradient(180deg,rgba(40,40,44,0.78),rgba(22,22,26,0.78));
-  border:0.5px solid var(--hair-strong);border-radius:24px;
-  padding:30px 26px 26px;text-align:center;
-  backdrop-filter:blur(34px) saturate(180%);-webkit-backdrop-filter:blur(34px) saturate(180%);
-  box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 0.5px 0 rgba(255,255,255,0.08);}
-.lock-ic{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;margin:0 auto 16px;
-  background:linear-gradient(180deg,rgba(10,132,255,0.26),rgba(10,132,255,0.08));
-  border:0.5px solid rgba(10,132,255,0.35);
-  color:var(--teal);box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.18);}
-.lock-ic svg{width:28px;height:28px;}
-.lock-title{font-size:21px;font-weight:700;letter-spacing:-0.6px;color:var(--text);margin-bottom:6px;}
-.lock-sub{font-size:13px;color:var(--text-2);margin-bottom:24px;}
-.lock-dots{display:flex;justify-content:center;gap:14px;margin-bottom:14px;}
-.lock-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--text-3);
-  transition:background .15s,border-color .15s,transform .12s var(--ease);}
-.lock-dot.on{background:var(--blue);border-color:var(--blue);box-shadow:0 0 10px rgba(10,132,255,.45);}
+.lock-ambient::before,.lock-ambient::after{content:"";position:absolute;border-radius:50%;filter:blur(110px);will-change:transform;}
+.lock-ambient::before{width:420px;height:420px;background:#0a4d99;top:-140px;left:-120px;opacity:.32;animation:drift1 40s ease-in-out infinite;}
+.lock-ambient::after{width:340px;height:340px;background:#5e2a8c;bottom:-130px;right:-100px;opacity:.26;animation:drift2 46s ease-in-out infinite;}
+.lock-card{position:relative;z-index:1;width:min(92vw,420px);
+  background:transparent;border:none;padding:0;text-align:center;
+  animation:lockCardIn .7s cubic-bezier(.32,.72,0,1) both;}
+@keyframes lockCardIn{from{opacity:0;transform:translateY(20px) scale(.96);}to{opacity:1;transform:none;}}
+.lock-brand{font-size:clamp(64px,16vw,96px);font-weight:800;letter-spacing:-3px;text-align:center;
+  margin-bottom:48px;line-height:1;
+  background:linear-gradient(180deg,#fff 25%,rgba(235,235,245,0.55));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 10px 38px rgba(10,132,255,.28));}
+.lock-dots{display:flex;justify-content:center;gap:18px;margin-bottom:18px;}
+.lock-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.22);
+  background:transparent;
+  transition:background .25s var(--ease),border-color .25s var(--ease),transform .2s var(--ease),box-shadow .25s var(--ease);}
+.lock-dot.on{background:#fff;border-color:#fff;
+  box-shadow:0 0 14px rgba(255,255,255,.5);
+  animation:lockDotPop .32s cubic-bezier(.5,1.6,.4,1);}
+@keyframes lockDotPop{0%{transform:scale(.5);}50%{transform:scale(1.3);}100%{transform:scale(1);}}
+.lock-hint{font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:1.5px;}
+
+/* unlock success animation */
+.lock-dot.success{background:#30d158;border-color:#30d158;
+  box-shadow:0 0 18px rgba(48,209,88,.75),inset 0 0.5px 0 rgba(255,255,255,0.35);
+  animation:lockDotOK .45s cubic-bezier(.5,1.6,.4,1);}
+@keyframes lockDotOK{0%{transform:scale(1);}40%{transform:scale(1.45);}100%{transform:scale(1.1);}}
+.lock.unlocking .lock-card{animation:lockCardOut .55s cubic-bezier(.4,0,.2,1) forwards;}
+.lock.unlocking{animation:lockBgOut .55s ease forwards;}
+@keyframes lockCardOut{
+  0%{opacity:1;transform:none;filter:blur(0);}
+  100%{opacity:0;transform:scale(1.12) translateY(-14px);filter:blur(10px);}
+}
+@keyframes lockBgOut{to{opacity:0;}}
 .lock-err{font-size:12.5px;color:#ff6b62;font-weight:600;letter-spacing:0.2px;
   opacity:0;transition:opacity .15s;min-height:18px;margin-top:4px;}
 .lock-err.show{opacity:1;}
-#lockInput{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
+.lock-card{position:relative;}
+#lockInput{position:absolute;inset:0;width:100%;height:100%;opacity:0;background:transparent;border:none;
+  font-size:16px;color:transparent;caret-color:transparent;cursor:pointer;
+  -webkit-appearance:none;appearance:none;border-radius:24px;padding:0;margin:0;outline:none;}
 @keyframes lockShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-9px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(5px);}}
 .lock-card.shake{animation:lockShake .45s cubic-bezier(.32,.72,0,1);}
 
@@ -839,15 +919,12 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
 <div class="lock" id="lockScreen" role="dialog" aria-modal="true">
   <div class="lock-ambient"></div>
   <div class="lock-card">
-    <div class="lock-ic">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-    </div>
-    <h2 class="lock-title">Enter Passcode</h2>
-    <p class="lock-sub">Unlock Chronos to continue</p>
+    <div class="lock-brand">Chronos</div>
     <div class="lock-dots" id="lockDots">
       <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
       <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
     </div>
+    <div class="lock-hint">Enter passcode</div>
     <input id="lockInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus aria-label="Passcode">
     <div class="lock-err" id="lockErr">Wrong passcode</div>
   </div>
@@ -895,6 +972,12 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
   <div class="view" id="timerView">
     <div class="timer-hero">
       <div class="dial">
+        <div class="dial-fx" aria-hidden="true">
+          <span class="dial-swirl"></span>
+          <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+          <span class="blob b4"></span><span class="blob b5"></span><span class="blob b6"></span>
+          <span class="blob b7"></span>
+        </div>
         <svg class="ring" viewBox="0 0 200 200">
           <circle class="ring-tick" cx="100" cy="100" r="82"/>
           <circle class="ring-track" cx="100" cy="100" r="92"/>
@@ -1274,7 +1357,8 @@ function syncUI(){const run=state.running;const label=run?'Pause':(state.elapsed
     document.getElementById(l).textContent=label;document.getElementById(b).classList.toggle('run',run);
     document.getElementById(i).innerHTML=run?'<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>':'<path d="M8 5v14l11-7z"/>';});
   [['pill','stateTxt']].forEach(([p,t])=>{document.getElementById(p).classList.toggle('run',run);document.getElementById(t).textContent=sTxt;});
-  document.querySelector('.dial').classList.toggle('running',run);}
+  document.querySelector('.dial').classList.toggle('running',run);
+  document.body.classList.toggle('timer-on',run);}
 
 /* ---------- controls ---------- */
 function toggle(){if(state.running){state.elapsed=currentMs();state.running=false;save();}else{state.startTs=performance.now();state.running=true;}syncUI();}
@@ -1908,7 +1992,9 @@ document.querySelectorAll('.tab').forEach(t=>{t.onclick=()=>{document.querySelec
   }
   if(v==='stats')buildStats();
   if(v==='habits')renderHabitsAll();
-  if(v==='timer'){autoGrowNotes();}};});
+  if(v==='timer'){autoGrowNotes();}
+  document.body.classList.toggle('view-timer',v==='timer');};});
+document.body.classList.add('view-timer');
 
 /* ---------- live header clock ---------- */
 (function(){
@@ -2007,7 +2093,17 @@ function openWeekGoals(){
   var screen=document.getElementById('lockScreen');
   function syncDots(){var n=input.value.length;dots.forEach(function(d,i){d.classList.toggle('on',i<n);});}
   function focusInput(){try{input.focus({preventScroll:true});}catch(e){try{input.focus();}catch(e){}}}
-  function unlock(){document.documentElement.classList.remove('locked');setTimeout(function(){screen.style.display='none';},100);}
+  function unlock(){
+    // success cascade on dots, then card out, then drop lock
+    dots.forEach(function(d,i){setTimeout(function(){d.classList.remove('on');d.classList.add('success');},i*55);});
+    setTimeout(function(){screen.classList.add('unlocking');},dots.length*55+40);
+    setTimeout(function(){
+      document.documentElement.classList.remove('locked');
+      screen.style.display='none';
+      screen.classList.remove('unlocking');
+      dots.forEach(function(d){d.classList.remove('success');});
+    },dots.length*55+600);
+  }
   function fail(){
     err.classList.add('show');card.classList.add('shake');
     setTimeout(function(){card.classList.remove('shake');},480);
