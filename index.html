@@ -671,6 +671,42 @@ body{
 .tab.active{color:#fff;}
 
 
+/* passcode lock */
+html.locked .app,html.locked .tabbar,html.locked .install,html.locked .toast,
+html.locked .sheet,html.locked .sheet-bg,html.locked .modal,html.locked .modal-bg{display:none!important;}
+html.locked .ambient{opacity:.4;}
+.lock{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 30%,rgba(10,30,60,0.95),#000 70%);
+  padding:24px;}
+html.locked .lock{display:flex;}
+.lock-ambient{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.lock-ambient::before,.lock-ambient::after{content:"";position:absolute;border-radius:50%;filter:blur(110px);}
+.lock-ambient::before{width:380px;height:380px;background:#0a84ff;top:-120px;left:-100px;opacity:.18;animation:drift1 40s ease-in-out infinite;}
+.lock-ambient::after{width:320px;height:320px;background:#5e5ce6;bottom:-120px;right:-100px;opacity:.14;animation:drift2 46s ease-in-out infinite;}
+.lock-card{position:relative;z-index:1;width:min(92vw,380px);
+  background:linear-gradient(180deg,rgba(40,40,44,0.78),rgba(22,22,26,0.78));
+  border:0.5px solid var(--hair-strong);border-radius:24px;
+  padding:30px 26px 26px;text-align:center;
+  backdrop-filter:blur(34px) saturate(180%);-webkit-backdrop-filter:blur(34px) saturate(180%);
+  box-shadow:0 20px 60px rgba(0,0,0,.6),inset 0 0.5px 0 rgba(255,255,255,0.08);}
+.lock-ic{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;margin:0 auto 16px;
+  background:linear-gradient(180deg,rgba(10,132,255,0.26),rgba(10,132,255,0.08));
+  border:0.5px solid rgba(10,132,255,0.35);
+  color:var(--teal);box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.18);}
+.lock-ic svg{width:28px;height:28px;}
+.lock-title{font-size:21px;font-weight:700;letter-spacing:-0.6px;color:var(--text);margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text-2);margin-bottom:24px;}
+.lock-dots{display:flex;justify-content:center;gap:14px;margin-bottom:14px;}
+.lock-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--text-3);
+  transition:background .15s,border-color .15s,transform .12s var(--ease);}
+.lock-dot.on{background:var(--blue);border-color:var(--blue);box-shadow:0 0 10px rgba(10,132,255,.45);}
+.lock-err{font-size:12.5px;color:#ff6b62;font-weight:600;letter-spacing:0.2px;
+  opacity:0;transition:opacity .15s;min-height:18px;margin-top:4px;}
+.lock-err.show{opacity:1;}
+#lockInput{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;}
+@keyframes lockShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-9px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(5px);}}
+.lock-card.shake{animation:lockShake .45s cubic-bezier(.32,.72,0,1);}
+
 /* in-app modal (confirm + prompt) */
 .modal-bg{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
   opacity:0;pointer-events:none;transition:opacity .25s var(--ease);}
@@ -792,6 +828,26 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
 </style>
 </head>
 <body>
+<script>document.documentElement.classList.add('locked');</script>
+
+<!-- passcode lock -->
+<div class="lock" id="lockScreen" role="dialog" aria-modal="true">
+  <div class="lock-ambient"></div>
+  <div class="lock-card">
+    <div class="lock-ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    </div>
+    <h2 class="lock-title">Enter Passcode</h2>
+    <p class="lock-sub">Unlock Chronos to continue</p>
+    <div class="lock-dots" id="lockDots">
+      <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
+      <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
+    </div>
+    <input id="lockInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus aria-label="Passcode">
+    <div class="lock-err" id="lockErr">Wrong passcode</div>
+  </div>
+</div>
+
 <div class="ambient"></div>
 
 <!-- shared svg defs + logo -->
@@ -1934,6 +1990,41 @@ function openWeekGoals(){
   var wkBg=document.getElementById('wkBg');
   if(wkBg)wkBg.onclick=function(){var w=document.getElementById('wkSheet');w&&w.classList.remove('on');wkBg.classList.remove('on');};
   var btn=document.getElementById('sWkGoalsBtn');if(btn)btn.onclick=openWeekGoals;
+})();
+
+/* passcode lock */
+(function(){
+  var PASS='779549';
+  var input=document.getElementById('lockInput');
+  var dots=document.querySelectorAll('#lockDots .lock-dot');
+  var card=document.querySelector('.lock-card');
+  var err=document.getElementById('lockErr');
+  var screen=document.getElementById('lockScreen');
+  function syncDots(){var n=input.value.length;dots.forEach(function(d,i){d.classList.toggle('on',i<n);});}
+  function focusInput(){try{input.focus({preventScroll:true});}catch(e){try{input.focus();}catch(e){}}}
+  function unlock(){document.documentElement.classList.remove('locked');setTimeout(function(){screen.style.display='none';},100);}
+  function fail(){
+    err.classList.add('show');card.classList.add('shake');
+    setTimeout(function(){card.classList.remove('shake');},480);
+    setTimeout(function(){input.value='';syncDots();err.classList.remove('show');focusInput();},600);
+  }
+  input.addEventListener('input',function(){
+    input.value=input.value.replace(/\D/g,'').slice(0,6);
+    syncDots();
+    if(input.value.length===6){if(input.value===PASS)unlock();else fail();}
+  });
+  // keep focus
+  screen.addEventListener('click',focusInput);
+  screen.addEventListener('touchstart',focusInput,{passive:true});
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){
+      document.documentElement.classList.add('locked');
+      screen.style.display='';
+      input.value='';syncDots();err.classList.remove('show');
+    }else if(document.documentElement.classList.contains('locked')){focusInput();}
+  });
+  // initial focus after layout
+  setTimeout(focusInput,80);
 })();
 
 /* in-app confirm + prompt (replaces native browser dialogs) */
