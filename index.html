@@ -732,7 +732,7 @@ body{
 .widget-pager{margin:0 -16px 0;position:relative;}
 .widget-track{display:flex;overflow-x:auto;overflow-y:visible;
   scroll-snap-type:x mandatory;scroll-behavior:smooth;
-  -webkit-overflow-scrolling:touch;touch-action:pan-x;
+  -webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;
   scrollbar-width:none;padding:0;}
 .widget-track::-webkit-scrollbar{height:0;display:none;}
 .widget-track .widget-card{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;
@@ -757,20 +757,22 @@ body{
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
 .widget-card .chip{font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;}
 
-/* tiles inside widget card — bigger, gradient nums */
+/* tiles inside widget card — bigger, gradient nums, auto-shrink */
 .widget-card .stat{background:linear-gradient(180deg,rgba(50,50,56,0.5),rgba(28,28,32,0.5));
-  padding:18px 16px;border-radius:18px;}
+  padding:18px 16px;border-radius:18px;min-width:0;overflow:hidden;}
 .widget-card .stat .l{font-size:11.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:14px;}
-.widget-card .stat .v{font-size:34px;font-weight:800;letter-spacing:-1.4px;line-height:1;}
-.widget-card .stat .v .u{font-size:16px;font-weight:700;}
+.widget-card .stat .v{font-size:clamp(22px,7.5vw,34px);font-weight:800;letter-spacing:-1.4px;line-height:1;
+  white-space:nowrap;overflow:hidden;text-overflow:clip;min-width:0;}
+.widget-card .stat .v .u{font-size:clamp(11px,3.4vw,16px);font-weight:700;}
 .widget-card .stat .sub{font-size:11.5px;margin-top:6px;font-weight:600;letter-spacing:-0.05px;}
 .widget-card .stat .l .ic{width:32px;height:32px;border-radius:10px;}
 .widget-card .stat .l .ic svg{width:16px;height:16px;}
 /* 3-up tiles inside All Time card — match 2-col tile height */
 .widget-card .stat-grid.three{align-items:stretch;}
-.widget-card .stat-grid.three .stat{padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between;min-height:130px;}
-.widget-card .stat-grid.three .stat .v{font-size:26px;letter-spacing:-1px;line-height:1;margin-top:auto;}
-.widget-card .stat-grid.three .stat .v .u{font-size:13px;font-weight:700;}
+.widget-card .stat-grid.three .stat{padding:18px 10px;display:flex;flex-direction:column;justify-content:space-between;min-height:130px;min-width:0;overflow:hidden;}
+.widget-card .stat-grid.three .stat .v{font-size:clamp(16px,5.2vw,26px);letter-spacing:-0.9px;line-height:1;margin-top:auto;
+  white-space:nowrap;overflow:hidden;text-overflow:clip;}
+.widget-card .stat-grid.three .stat .v .u{font-size:clamp(10px,2.6vw,13px);font-weight:700;}
 .widget-card .stat-grid.three .stat .l{font-size:10.5px;margin-bottom:10px;gap:6px;flex:none;}
 .widget-card .stat-grid.three .stat .l .ic{width:26px;height:26px;border-radius:9px;}
 .widget-card .stat-grid.three .stat .l .ic svg{width:14px;height:14px;}
@@ -782,7 +784,7 @@ body{
   border-top:0.5px solid var(--hair);padding-top:18px;}
 .inner-track{display:flex;overflow:hidden;overflow-x:auto;overflow-y:visible;
   scroll-snap-type:x mandatory;scroll-behavior:smooth;
-  -webkit-overflow-scrolling:touch;touch-action:pan-x;
+  -webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;
   scrollbar-width:none;padding:0;}
 .inner-track::-webkit-scrollbar{height:0;display:none;}
 .inner-page{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;
