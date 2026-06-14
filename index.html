@@ -716,6 +716,107 @@ body{
 .reset-row .rr-icon.grey{background:rgba(255,255,255,0.08);color:rgba(235,235,245,0.7);}
 /* settings button on stats page */
 .settings-btn{margin-top:14px;}
+/* 3-up stat grid (All Time) */
+.stat-grid.three{grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.stat-grid.three .stat{padding:14px 12px;}
+.stat-grid.three .stat .v{font-size:22px;letter-spacing:-0.8px;}
+.stat-grid.three .stat .l{font-size:11px;gap:7px;margin-bottom:8px;}
+.stat-grid.three .stat .l .ic{width:24px;height:24px;border-radius:8px;}
+.stat-grid.three .stat .l .ic svg{width:13px;height:13px;}
+/* group cards — tiles inside don't double border */
+.stats-group{padding-bottom:18px;}
+.stats-group .stat-grid{margin-top:0;}
+
+/* iOS-style widget pager — full-bleed up to header */
+#statsView{padding-top:0;}
+.widget-pager{margin:0 -16px 0;position:relative;}
+.widget-track{display:flex;overflow-x:auto;overflow-y:visible;
+  scroll-snap-type:x mandatory;scroll-behavior:smooth;
+  -webkit-overflow-scrolling:touch;touch-action:pan-x;
+  scrollbar-width:none;padding:0;}
+.widget-track::-webkit-scrollbar{height:0;display:none;}
+.widget-track .widget-card{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;
+  margin-top:0;padding:24px 22px 28px;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,rgba(38,38,44,0.4),rgba(18,18,22,0.6));
+  border:none;border-radius:0 0 28px 28px;box-shadow:none;
+  transition:transform .4s var(--ease);}
+/* corner halo per card, theme-colored — bleeds edge-to-edge */
+.widget-card::before{content:"";position:absolute;inset:-20% -15% auto auto;width:320px;height:320px;border-radius:50%;
+  background:radial-gradient(closest-side,var(--gw,rgba(10,132,255,0.3)),transparent 70%);pointer-events:none;z-index:0;}
+.widget-card::after{content:"";position:absolute;bottom:-30%;left:-20%;width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(closest-side,var(--gw2,rgba(94,92,230,0.22)),transparent 70%);pointer-events:none;z-index:0;}
+.widget-card>*{position:relative;z-index:1;}
+.widget-card:nth-child(1){--gw:rgba(10,132,255,0.26);--gw2:rgba(48,209,88,0.16);}
+.widget-card:nth-child(2){--gw:rgba(255,55,95,0.26);--gw2:rgba(94,92,230,0.18);}
+.widget-card:nth-child(3){--gw:rgba(191,90,242,0.26);--gw2:rgba(100,210,255,0.16);}
+
+/* widget card title presentation */
+.widget-card .c-head{margin-bottom:18px;}
+.widget-card .c-title{font-size:22px;font-weight:800;letter-spacing:-0.6px;
+  background:linear-gradient(180deg,#fff,rgba(235,235,245,0.7));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.widget-card .chip{font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;}
+
+/* tiles inside widget card — bigger, gradient nums */
+.widget-card .stat{background:linear-gradient(180deg,rgba(50,50,56,0.5),rgba(28,28,32,0.5));
+  padding:18px 16px;border-radius:18px;}
+.widget-card .stat .l{font-size:11.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:14px;}
+.widget-card .stat .v{font-size:34px;font-weight:800;letter-spacing:-1.4px;line-height:1;}
+.widget-card .stat .v .u{font-size:16px;font-weight:700;}
+.widget-card .stat .sub{font-size:11.5px;margin-top:6px;font-weight:600;letter-spacing:-0.05px;}
+.widget-card .stat .l .ic{width:32px;height:32px;border-radius:10px;}
+.widget-card .stat .l .ic svg{width:16px;height:16px;}
+/* 3-up tiles inside All Time card — match 2-col tile height */
+.widget-card .stat-grid.three{align-items:stretch;}
+.widget-card .stat-grid.three .stat{padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between;min-height:130px;}
+.widget-card .stat-grid.three .stat .v{font-size:26px;letter-spacing:-1px;line-height:1;margin-top:auto;}
+.widget-card .stat-grid.three .stat .v .u{font-size:13px;font-weight:700;}
+.widget-card .stat-grid.three .stat .l{font-size:10.5px;margin-bottom:10px;gap:6px;flex:none;}
+.widget-card .stat-grid.three .stat .l .ic{width:26px;height:26px;border-radius:9px;}
+.widget-card .stat-grid.three .stat .l .ic svg{width:14px;height:14px;}
+/* live dot bigger inside widget */
+.widget-card .live-dot{width:10px;height:10px;}
+
+/* inner pager — inside Today card, pages share card chrome */
+.inner-pager{margin:22px -20px 0;position:relative;
+  border-top:0.5px solid var(--hair);padding-top:18px;}
+.inner-track{display:flex;overflow:hidden;overflow-x:auto;overflow-y:visible;
+  scroll-snap-type:x mandatory;scroll-behavior:smooth;
+  -webkit-overflow-scrolling:touch;touch-action:pan-x;
+  scrollbar-width:none;padding:0;}
+.inner-track::-webkit-scrollbar{height:0;display:none;}
+.inner-page{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;
+  padding:2px 20px 6px;min-width:0;}
+.inner-eyebrow{font-size:11px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--teal);margin-bottom:16px;display:flex;align-items:center;}
+.inner-eyebrow .chip{font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 9px;text-transform:uppercase;}
+.inner-pager .widget-dots{margin-top:14px;padding-bottom:2px;}
+.inner-page .habit-table-wrap{margin-top:0;border-top:none;padding-top:0;}
+.inner-page .pager{margin-top:16px;}
+
+/* compact widget pager — normal card style, not full-bleed, with gap */
+.widget-pager.compact{margin:14px -16px 0;}
+.widget-pager.compact .widget-track{padding:4px 16px 8px;gap:14px;
+  scroll-padding:0 16px;}
+.widget-pager.compact .widget-track .widget-card{
+  flex:0 0 calc(100% - 32px);scroll-snap-align:center;
+  padding:20px;border-radius:20px;
+  background:linear-gradient(180deg,rgba(34,34,38,0.62),rgba(22,22,26,0.62));
+  border:0.5px solid var(--hair);
+  box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.06),0 4px 24px rgba(0,0,0,.2);
+  transition:transform .45s cubic-bezier(.32,.72,0,1);}
+.widget-pager.compact .widget-card::before,
+.widget-pager.compact .widget-card::after{display:none;}
+.widget-pager.compact .widget-dots{margin-top:14px;}
+
+/* page indicator dots */
+.widget-dots{display:flex;justify-content:center;gap:8px;margin-top:14px;padding:0 4px;}
+.wd{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;padding:0;
+  cursor:pointer;
+  transition:width .45s cubic-bezier(.32,.72,0,1),background .3s,transform .15s,box-shadow .3s;}
+.wd:active{transform:scale(.85);}
+.wd.active{width:28px;background:linear-gradient(90deg,#3398ff,#0a78ee);border-radius:4px;
+  box-shadow:0 3px 10px rgba(10,132,255,.5);}
 /* set-card inside settings sheet — slim card without full glass chrome */
 .set-card{margin:0 0 4px;}
 .set-card .c-head{margin-bottom:12px;}
@@ -1008,24 +1109,31 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
       </div>
     </div>
 
-    <div class="card">
-      <div class="c-head">
-        <div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Notes</div>
-        <span class="saved" id="savedTag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Saved</span>
+    <div class="widget-pager compact">
+      <div class="widget-track" id="timerPager">
+        <div class="widget-card card">
+          <div class="c-head">
+            <div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Notes</div>
+            <span class="saved" id="savedTag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Saved</span>
+          </div>
+          <textarea class="notes" id="notes" placeholder="A persistent scratchpad — saved in your browser, stays until you change it."></textarea>
+        </div>
+        <div class="widget-card card">
+          <div class="c-head">
+            <div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Today's Goals</div>
+            <span class="chip" id="goalChip">0</span>
+          </div>
+          <div class="g-input">
+            <input id="goalInput" placeholder="What did you accomplish?" maxlength="140">
+            <button class="add" id="addBtn" aria-label="Add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+          <ul class="g-list" id="goalList"></ul>
+        </div>
       </div>
-      <textarea class="notes" id="notes" placeholder="A persistent scratchpad — saved in your browser, stays until you change it."></textarea>
-    </div>
-
-    <div class="card">
-      <div class="c-head">
-        <div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Today's Goals</div>
-        <span class="chip" id="goalChip">0</span>
+      <div class="widget-dots" id="timerDots">
+        <button class="wd active" data-idx="0" aria-label="Notes"></button>
+        <button class="wd" data-idx="1" aria-label="Goals"></button>
       </div>
-      <div class="g-input">
-        <input id="goalInput" placeholder="What did you accomplish?" maxlength="140">
-        <button class="add" id="addBtn" aria-label="Add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-      </div>
-      <ul class="g-list" id="goalList"></ul>
     </div>
 
     <div class="vision-wrap" id="visionWrap" hidden>
@@ -1044,15 +1152,36 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
 
   <!-- STATS -->
   <div class="view hidden" id="statsView">
-    <div class="s-hd">Overview</div>
-    <div class="stat-grid">
-      <div class="stat blue"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Today<span class="live-dot" id="liveDot"></span></div><div class="v num" id="sToday">0:00:00</div><div class="sub" id="sTodaySub">live</div></div>
-      <div class="stat green"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Goals today</div><div class="v num" id="sTodayGoals">0</div><div class="sub" id="sTodayGoalsSub">0 done</div></div>
-      <div class="stat amber"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Total hours</div><div class="v num" id="sTotalHrs">0<span class="u">h</span></div></div>
-      <div class="stat violet"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Days tracked</div><div class="v num" id="sDays">0</div></div>
-      <div class="stat teal"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>Avg / day</div><div class="v num" id="sAvg">0<span class="u">h</span></div></div>
-      <div class="stat pink"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Hours this week</div><div class="v num" id="sWkHrs">0<span class="u">h</span></div></div>
-      <div class="stat indigo" id="sWkGoalsBtn" style="cursor:pointer"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Goals this week</div><div class="v num" id="sWkGoals">0</div><div class="sub" style="color:#8e8cf0;font-weight:600">Tap to view</div></div>
+    <div class="widget-pager">
+      <div class="widget-track" id="statsPager">
+        <div class="widget-card card stats-group">
+          <div class="c-head"><div class="c-title">Today</div><span class="live-dot" id="liveDot"></span></div>
+          <div class="stat-grid">
+            <div class="stat blue"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Time</div><div class="v num" id="sToday">0:00:00</div><div class="sub" id="sTodaySub">live</div></div>
+            <div class="stat green"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Goals</div><div class="v num" id="sTodayGoals">0</div><div class="sub" id="sTodayGoalsSub">0 done</div></div>
+          </div>
+        </div>
+        <div class="widget-card card stats-group">
+          <div class="c-head"><div class="c-title">This Week</div><span class="chip">Sun – today</span></div>
+          <div class="stat-grid">
+            <div class="stat pink"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Hours</div><div class="v num" id="sWkHrs">0<span class="u">h</span></div></div>
+            <div class="stat indigo" id="sWkGoalsBtn" style="cursor:pointer"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Goals</div><div class="v num" id="sWkGoals">0</div><div class="sub" style="color:#8e8cf0;font-weight:600">Tap to view</div></div>
+          </div>
+        </div>
+        <div class="widget-card card stats-group">
+          <div class="c-head"><div class="c-title">All Time</div></div>
+          <div class="stat-grid three">
+            <div class="stat amber"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Hours</div><div class="v num" id="sTotalHrs">0<span class="u">h</span></div></div>
+            <div class="stat violet"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>Days</div><div class="v num" id="sDays">0</div></div>
+            <div class="stat teal"><div class="l"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>Avg / day</div><div class="v num" id="sAvg">0<span class="u">h</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="widget-dots" id="statsDots">
+        <button class="wd active" data-idx="0" aria-label="Today"></button>
+        <button class="wd" data-idx="1" aria-label="This Week"></button>
+        <button class="wd" data-idx="2" aria-label="All Time"></button>
+      </div>
     </div>
 
     <div class="card">
@@ -1118,19 +1247,27 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
         </div>
       </div>
       <div class="habit-stats" id="habitStats"></div>
-      <div class="today-chips" id="todayChips"></div>
-    </div>
 
-    <div class="card">
-      <div class="c-head">
-        <div class="c-title">History</div>
-        <span class="chip" id="habitHistChip">—</span>
-      </div>
-      <div class="habit-table-wrap" id="habitTableWrap"></div>
-      <div class="pager" id="habitPager">
-        <button class="pg-btn" id="hpPrev" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <span class="pg-info" id="hpInfo">1 / 1</span>
-        <button class="pg-btn" id="hpNext" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      <div class="inner-pager">
+        <div class="inner-track" id="todayInnerPager">
+          <div class="inner-page">
+            <div class="inner-eyebrow">History <span class="chip" id="habitHistChip" style="margin-left:6px">—</span></div>
+            <div class="habit-table-wrap" id="habitTableWrap"></div>
+            <div class="pager" id="habitPager">
+              <button class="pg-btn" id="hpPrev" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <span class="pg-info" id="hpInfo">1 / 1</span>
+              <button class="pg-btn" id="hpNext" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+            </div>
+          </div>
+          <div class="inner-page">
+            <div class="inner-eyebrow">Habits</div>
+            <div class="today-chips" id="todayChips"></div>
+          </div>
+        </div>
+        <div class="widget-dots" id="todayInnerDots">
+          <button class="wd active" data-idx="0" aria-label="History"></button>
+          <button class="wd" data-idx="1" aria-label="Habits"></button>
+        </div>
       </div>
     </div>
 
@@ -1720,6 +1857,7 @@ async function toggleHabitToday(id){
   renderTodayChips(id);     // animate the toggled one
   renderHabitStats();
   renderHabitTable();
+  renderCheckoff();
 }
 
 /* ----- render: manage list ----- */
@@ -1942,7 +2080,23 @@ function habitPageCount(){
 }
 
 /* ----- render all habit UI ----- */
-function renderHabitsAll(){renderHabitManage();renderTodayChips();renderHabitStats();renderHabitTable();}
+function renderCheckoff(){
+  var wrap=document.getElementById('checkoffList');if(!wrap)return;
+  wrap.innerHTML='';
+  if(!habits.length)return;
+  var k=todayKey();var log=habitLog[k]||{};
+  habits.forEach(function(h){
+    var on=!!log[h.id];
+    var row=document.createElement('button');row.type='button';
+    row.className='co-row'+(on?' on':'');
+    row.style.background=on?h.color:'';
+    row.innerHTML='<span class="co-box" style="'+(on?'background:'+h.color:'')+'"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>'+
+      '<span class="co-name">'+escapeHtml(h.name)+'</span>';
+    row.onclick=function(){toggleHabitToday(h.id);};
+    wrap.appendChild(row);
+  });
+}
+function renderHabitsAll(){renderHabitManage();renderTodayChips();renderHabitStats();renderHabitTable();renderCheckoff();}
 
 /* ----- wire controls ----- */
 document.getElementById('addHabitBtn').onclick=addHabit;
@@ -2076,6 +2230,32 @@ function openWeekGoals(){
   if(wkBg)wkBg.onclick=function(){var w=document.getElementById('wkSheet');w&&w.classList.remove('on');wkBg.classList.remove('on');};
   var btn=document.getElementById('sWkGoalsBtn');if(btn)btn.onclick=openWeekGoals;
 })();
+
+/* widget pager helper (iOS-style) */
+function _wirePager(pagerId,dotsId){
+  var pager=document.getElementById(pagerId);
+  var dotsWrap=document.getElementById(dotsId);
+  if(!pager||!dotsWrap)return;
+  var dots=dotsWrap.querySelectorAll('.wd');
+  function setActive(i){dots.forEach(function(d,k){d.classList.toggle('active',k===i);});}
+  function currentIdx(){
+    var center=pager.scrollLeft+pager.clientWidth/2;
+    var ch=pager.children,best=0,bestD=Infinity;
+    for(var i=0;i<ch.length;i++){
+      var c=ch[i],cc=c.offsetLeft+c.offsetWidth/2,d=Math.abs(cc-center);
+      if(d<bestD){bestD=d;best=i;}
+    }
+    return best;
+  }
+  pager.addEventListener('scroll',function(){setActive(currentIdx());},{passive:true});
+  dots.forEach(function(d,i){d.onclick=function(){
+    pager.children[i].scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  };});
+  setActive(0);
+}
+_wirePager('statsPager','statsDots');
+_wirePager('todayInnerPager','todayInnerDots');
+_wirePager('timerPager','timerDots');
 
 /* settings sheet */
 (function(){
