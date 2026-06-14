@@ -710,6 +710,15 @@ body{
 .reset-row .rr-icon svg{width:18px;height:18px;}
 .reset-row .rr-icon.blue{background:rgba(10,132,255,0.16);color:var(--teal);}
 .reset-row .rr-icon.green{background:rgba(48,209,88,0.16);color:var(--green);}
+.reset-row .rr-icon.amber{background:rgba(255,159,10,0.16);color:#ff9f0a;}
+.reset-row .rr-icon.violet{background:rgba(191,90,242,0.16);color:#bf5af2;}
+.reset-row .rr-icon.pink{background:rgba(255,55,95,0.16);color:#ff6482;}
+.reset-row .rr-icon.grey{background:rgba(255,255,255,0.08);color:rgba(235,235,245,0.7);}
+/* settings button on stats page */
+.settings-btn{margin-top:14px;}
+/* set-card inside settings sheet — slim card without full glass chrome */
+.set-card{margin:0 0 4px;}
+.set-card .c-head{margin-bottom:12px;}
 .reset-row.danger{border-color:rgba(255,69,58,.35);}
 .reset-row.danger .rr-title{color:#ff453a;}
 .reset-row.danger:active{background:rgba(255,69,58,.12);}
@@ -997,10 +1006,6 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
           <span id="playLabel">Start</span>
         </button>
       </div>
-      <div class="hint">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        Resets automatically at midnight
-      </div>
     </div>
 
     <div class="card">
@@ -1062,16 +1067,14 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
     </div>
 
     <div class="card">
-      <div class="c-head"><div class="c-title">Edit Today</div><span class="chip" id="goalChip2">0</span></div>
-      <div class="g-input">
-        <input id="goalInput2" placeholder="Add an accomplished goal…" maxlength="140">
-        <button class="add" id="addBtn2" aria-label="Add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <div class="c-head">
+        <div class="c-title">Every Day</div>
+        <button class="collapse-toggle" id="everyDayToggle" aria-label="Toggle every day section">
+          <span class="ct-label" id="histChip">—</span>
+          <svg class="ct-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
       </div>
-      <ul class="g-list" id="goalList2"></ul>
-    </div>
-
-    <div class="card">
-      <div class="c-head"><div class="c-title">Every Day</div><span class="chip" id="histChip">—</span></div>
+      <div class="collapsible collapsed" id="everyDayPanel"><div class="collapsible-inner">
       <div class="search-box">
         <svg class="search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="histSearch" placeholder="Search by date or goal…" maxlength="60">
@@ -1088,34 +1091,14 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
         <span class="pg-info" id="pgInfo">1 / 1</span>
         <button class="pg-btn" id="pgNext" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
+      </div></div>
     </div>
 
-    <div class="card">
-      <div class="c-head"><div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>Backup</div></div>
-      <button class="reset-row" id="exportBtn">
-        <div class="rr-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></div>
-        <div class="rr-text"><div class="rr-title">Export Data</div><div class="rr-sub">Download everything as a JSON file</div></div>
-        <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <button class="reset-row" id="importBtn">
-        <div class="rr-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5M12 4v12"/></svg></div>
-        <div class="rr-text"><div class="rr-title">Import Data</div><div class="rr-sub">Restore from a JSON backup file</div></div>
-        <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
-    </div>
-
-    <div class="card danger-card">
-      <div class="c-head"><div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Data &amp; Reset</div></div>
-      <button class="reset-row" id="resetTodayBtn">
-        <div class="rr-text"><div class="rr-title">Reset Today</div><div class="rr-sub">Clear today's timer and goals only</div></div>
-        <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <button class="reset-row danger" id="factoryResetBtn">
-        <div class="rr-text"><div class="rr-title">Factory Reset</div><div class="rr-sub">Erase all history, goals, notes &amp; settings</div></div>
-        <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-    </div>
+    <button class="reset-row settings-btn" id="settingsBtn" style="margin-top:14px">
+      <div class="rr-icon grey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <div class="rr-text"><div class="rr-title">Settings</div><div class="rr-sub">Backup, reset, habits &amp; more</div></div>
+      <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
   </div>
 
   <!-- HABITS -->
@@ -1141,22 +1124,8 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
     <div class="card">
       <div class="c-head">
         <div class="c-title">History</div>
-        <button class="collapse-toggle" id="filterToggle" aria-label="Toggle search & filters">
-          <span class="ct-label">Search &amp; Filter</span>
-          <svg class="ct-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
+        <span class="chip" id="habitHistChip">—</span>
       </div>
-      <div class="collapsible collapsed" id="filterPanel">
-        <div class="collapsible-inner">
-          <div class="search-box">
-            <svg class="search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input id="habitSearch" placeholder="Search by date or habit…" maxlength="60">
-            <button class="search-clear hide" id="habitSearchClear" aria-label="Clear search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-          </div>
-          <div class="filter-row" id="habitFilters"></div>
-        </div>
-      </div>
-      <div class="hist-meta"><span class="chip" id="habitHistChip">—</span></div>
       <div class="habit-table-wrap" id="habitTableWrap"></div>
       <div class="pager" id="habitPager">
         <button class="pg-btn" id="hpPrev" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -1165,32 +1134,6 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
       </div>
     </div>
 
-    <div class="card habit-add-card">
-      <div class="c-head">
-        <div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>Manage Habits <span class="chip" id="habitCountChip" style="margin-left:8px">0</span></div>
-        <button class="collapse-toggle" id="manageToggle" aria-label="Toggle manage habits">
-          <span class="ct-label">Edit</span>
-          <svg class="ct-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-      </div>
-      <div class="collapsible collapsed" id="managePanel">
-        <div class="collapsible-inner">
-          <div class="g-input">
-            <input id="habitInput" placeholder="Add a habit to track…" maxlength="40">
-            <button class="add" id="addHabitBtn" aria-label="Add habit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-          </div>
-          <div class="habit-manage" id="habitManage"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card danger-card">
-      <div class="c-head"><div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Habit Data</div></div>
-      <button class="reset-row danger" id="clearHabitsBtn">
-        <div class="rr-text"><div class="rr-title">Clear All Habit Data</div><div class="rr-sub">Delete every habit and all check history</div></div>
-        <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-    </div>
   </div>
 </div>
 
@@ -1200,6 +1143,62 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
   <button class="tab" data-view="habits"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Habits</button>
   <button class="tab" data-view="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3.2" height="6"/><rect x="12.4" y="7" width="3.2" height="10"/><rect x="17.8" y="13" width="3.2" height="4"/></svg>Stats</button>
 </div></nav>
+
+<!-- settings sheet -->
+<div class="sheet-bg" id="settingsBg"></div>
+<div class="sheet" id="settingsSheet">
+  <div class="grab"></div>
+  <h2>Settings</h2>
+  <div class="sub">Backup, reset &amp; habit management</div>
+
+  <div class="sheet-sec">Backup</div>
+  <button class="reset-row" id="exportBtn">
+    <div class="rr-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></div>
+    <div class="rr-text"><div class="rr-title">Export Data</div><div class="rr-sub">Download everything as a JSON file</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <button class="reset-row" id="importBtn">
+    <div class="rr-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5M12 4v12"/></svg></div>
+    <div class="rr-text"><div class="rr-title">Import Data</div><div class="rr-sub">Restore from a JSON backup file</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+
+  <div class="sheet-sec" style="margin-top:18px">Habits</div>
+  <div class="set-card" id="manageWrap">
+    <div class="c-head">
+      <div class="c-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>Manage Habits <span class="chip" id="habitCountChip" style="margin-left:8px">0</span></div>
+      <button class="collapse-toggle" id="manageToggle" aria-label="Toggle manage habits">
+        <span class="ct-label">Edit</span>
+        <svg class="ct-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="collapsible collapsed" id="managePanel">
+      <div class="collapsible-inner">
+        <div class="g-input">
+          <input id="habitInput" placeholder="Add a habit to track…" maxlength="40">
+          <button class="add" id="addHabitBtn" aria-label="Add habit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div class="habit-manage" id="habitManage"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-sec" style="margin-top:18px">Danger Zone</div>
+  <button class="reset-row" id="resetTodayBtn">
+    <div class="rr-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div>
+    <div class="rr-text"><div class="rr-title">Reset Today</div><div class="rr-sub">Clear today's timer and goals only</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <button class="reset-row danger" id="clearHabitsBtn">
+    <div class="rr-text"><div class="rr-title">Clear All Habit Data</div><div class="rr-sub">Delete every habit and all check history</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <button class="reset-row danger" id="factoryResetBtn">
+    <div class="rr-text"><div class="rr-title">Factory Reset</div><div class="rr-sub">Erase all history, goals, notes &amp; settings</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+</div>
 
 <!-- week goals sheet -->
 <div class="sheet-bg" id="wkBg"></div>
@@ -1460,7 +1459,7 @@ setInterval(rollIfNeeded,15000);
 /* ---------- goals ---------- */
 var _goalsExpanded=false;
 function renderGoals(){
-  ['goalList','goalList2'].forEach(function(id){
+  ['goalList'].forEach(function(id){
     var ul=document.getElementById(id);ul.innerHTML='';
     if(!state.goals.length){ul.innerHTML='<div class="empty">No goals logged yet</div>';return;}
     var collapse=(id==='goalList' && state.goals.length>5 && !_goalsExpanded);
@@ -1482,7 +1481,6 @@ function renderGoals(){
     }
   });
   document.getElementById('goalChip').textContent=state.goals.length;
-  document.getElementById('goalChip2').textContent=state.goals.length;
   if(!document.getElementById('statsView').classList.contains('hidden'))liveStats();
 }
 function goalEl(g){const li=document.createElement('li');li.className='g-item'+(g.done?' done':'');
@@ -1496,14 +1494,13 @@ function goalEl(g){const li=document.createElement('li');li.className='g-item'+(
   li.append(c,t,e,d);return li;}
 function addGoal(id){const inp=document.getElementById(id);const v=inp.value.trim();if(!v)return;
   state.goals.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),text:v,done:true});inp.value='';save();renderGoals();}
-document.getElementById('addBtn').onclick=()=>addGoal('goalInput');document.getElementById('addBtn2').onclick=()=>addGoal('goalInput2');
+document.getElementById('addBtn').onclick=()=>addGoal('goalInput');
 document.getElementById('goalInput').addEventListener('keydown',e=>{if(e.key==='Enter')addGoal('goalInput');});
-document.getElementById('goalInput2').addEventListener('keydown',e=>{if(e.key==='Enter')addGoal('goalInput2');});
 
 /* ---------- notes (persistent global, independent of days) ---------- */
 const notesEl=document.getElementById('notes');let notesTimer=null;
-function autoGrowNotes(){notesEl.style.height='auto';notesEl.style.height=notesEl.scrollHeight+'px';}
-function renderNotes(){notesEl.value=globalNotes;autoGrowNotes();}
+function autoGrowNotes(){if(!notesEl)return;notesEl.style.height='auto';var h=notesEl.scrollHeight;if(h<10){requestAnimationFrame(autoGrowNotes);return;}notesEl.style.height=h+'px';}
+function renderNotes(){notesEl.value=globalNotes;autoGrowNotes();requestAnimationFrame(autoGrowNotes);}
 notesEl.addEventListener('input',()=>{globalNotes=notesEl.value;autoGrowNotes();clearTimeout(notesTimer);
   notesTimer=setTimeout(async()=>{await kvPut('notes',globalNotes);const t=document.getElementById('savedTag');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1400);},420);});
 
@@ -1784,7 +1781,7 @@ function renderTodayChips(animateId){
 
 /* ----- render: filter chips (per-habit) ----- */
 function renderHabitFilters(){
-  const wrap=document.getElementById('habitFilters');wrap.innerHTML='';
+  const wrap=document.getElementById('habitFilters');if(!wrap)return;wrap.innerHTML='';
   const mk=(val,label,color)=>{const b=document.createElement('button');b.className='filt'+(_hFilter===val?' active':'');b.dataset.filter=val;
     b.innerHTML=(color?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+color+';margin-right:6px;vertical-align:middle"></span>':'')+label;
     b.onclick=()=>{_hFilter=val;_hPage=0;renderHabitFilters();renderHabitTable();};return b;};
@@ -1945,7 +1942,7 @@ function habitPageCount(){
 }
 
 /* ----- render all habit UI ----- */
-function renderHabitsAll(){renderHabitManage();renderTodayChips();renderHabitStats();renderHabitFilters();renderHabitTable();}
+function renderHabitsAll(){renderHabitManage();renderTodayChips();renderHabitStats();renderHabitTable();}
 
 /* ----- wire controls ----- */
 document.getElementById('addHabitBtn').onclick=addHabit;
@@ -1959,19 +1956,16 @@ function wireCollapse(btnId,panelId,openByDefault){
   btn.onclick=()=>set(panel.classList.contains('collapsed'));
   _collapse[panelId]={set,isOpen:()=>!panel.classList.contains('collapsed')};
 }
-wireCollapse('filterToggle','filterPanel',false);
+wireCollapse('everyDayToggle','everyDayPanel',false);
 // Manage panel: open by default when there are no habits yet (so the add field is reachable)
 wireCollapse('manageToggle','managePanel', false);
 document.getElementById('hpPrev').onclick=()=>{if(_hPage>0){_hPage--;renderHabitTable();document.getElementById('habitTableWrap').scrollIntoView({behavior:'smooth',block:'nearest'});}};
 document.getElementById('hpNext').onclick=()=>{if(_hPage<habitPageCount()-1){_hPage++;renderHabitTable();document.getElementById('habitTableWrap').scrollIntoView({behavior:'smooth',block:'nearest'});}};
-const habitSearch=document.getElementById('habitSearch'),habitSearchClear=document.getElementById('habitSearchClear');
-habitSearch.addEventListener('input',()=>{_hQuery=habitSearch.value;_hPage=0;habitSearchClear.classList.toggle('hide',!habitSearch.value);renderHabitTable();});
-habitSearchClear.onclick=()=>{habitSearch.value='';_hQuery='';_hPage=0;habitSearchClear.classList.add('hide');renderHabitTable();habitSearch.focus();};
+// habit search/filter removed
 document.getElementById('clearHabitsBtn').onclick=async()=>{
   if(!habits.length&&!Object.keys(habitLog).length){toast('Nothing to clear');return;}
   if(!(await appConfirm({title:'Clear all habit data?',body:'Deletes every habit and its entire check history. Cannot be undone.',okText:'Clear',danger:true})))return;
   habits=[];habitLog={};_hPage=0;_hQuery='';_hFilter='all';
-  document.getElementById('habitSearch').value='';document.getElementById('habitSearchClear').classList.add('hide');
   await saveHabits();await saveHabitLog();renderHabitsAll();toast('Habit data cleared');
 };
 
@@ -2083,6 +2077,16 @@ function openWeekGoals(){
   var btn=document.getElementById('sWkGoalsBtn');if(btn)btn.onclick=openWeekGoals;
 })();
 
+/* settings sheet */
+(function(){
+  var sBg=document.getElementById('settingsBg'),sSheet=document.getElementById('settingsSheet');
+  if(!sBg||!sSheet)return;
+  function close(){sSheet.classList.remove('on');sBg.classList.remove('on');}
+  sBg.onclick=close;
+  var btn=document.getElementById('settingsBtn');
+  if(btn)btn.onclick=function(){sSheet.classList.add('on');sBg.classList.add('on');};
+})();
+
 /* passcode lock */
 (function(){
   var PASS='779549';
@@ -2106,6 +2110,7 @@ function openWeekGoals(){
         screen.style.display='none';
         screen.classList.remove('unlocking');
         dots.forEach(function(d){d.classList.remove('success');});
+        try{if(typeof autoGrowNotes==='function')requestAnimationFrame(autoGrowNotes);}catch(e){}
       },dots.length*55+600);
     },KB_WAIT);
   }
