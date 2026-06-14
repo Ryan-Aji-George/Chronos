@@ -368,14 +368,11 @@ body{
 
 /* notes */
 .notes{width:100%;min-height:110px;
-  background:linear-gradient(180deg,rgba(20,20,22,0.7),rgba(10,10,12,0.7));
-  border:0.5px solid var(--hair);border-radius:14px;
-  padding:14px 16px;color:var(--text);font-family:inherit;font-size:15px;line-height:1.55;outline:none;resize:none;
-  overflow:hidden;backdrop-filter:blur(14px);
-  box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.04);
-  transition:border-color .2s,box-shadow .2s;}
+  background:transparent;border:none;border-radius:0;
+  padding:4px 2px;color:var(--text);font-family:inherit;font-size:15px;line-height:1.55;outline:none;resize:none;
+  overflow:hidden;box-shadow:none;}
 .notes::placeholder{color:var(--text-3);}
-.notes:focus{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-dim);}
+.notes:focus{box-shadow:none;border:none;outline:none;}
 
 /* ===== stats ===== */
 .s-hd{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin:18px 6px 2px;
@@ -1651,19 +1648,23 @@ async function buildBackup(){
   const days=await dbAll();
   const dayMap={};days.forEach(d=>dayMap[d.date]=d);
   dayMap[state.date]={date:state.date,elapsed:currentMs(),goals:state.goals};
-  let visionBoard=null;
+  let visionBoard=null,sessions=null,activeSession=null;
   try{visionBoard=await kvGet('visionBoard');}catch(e){}
+  try{sessions=await kvGet('sessions');}catch(e){}
+  try{activeSession=await kvGet('activeSession');}catch(e){}
   return {
     app:'Chronos',
     type:'chronos-backup',
-    version:2,
+    version:3,
     exportedAt:new Date().toISOString(),
     days:Object.values(dayMap),
     notes:globalNotes,
     habits:habits,
     habitLog:habitLog,
     habitAuto:habitAuto,
-    visionBoard:visionBoard||null
+    visionBoard:visionBoard||null,
+    sessions:Array.isArray(sessions)?sessions:[],
+    activeSession:activeSession||null
   };
 }
 document.getElementById('exportBtn').onclick=async()=>{
@@ -1698,6 +1699,8 @@ document.getElementById('importFile').onchange=async(ev)=>{
     await kvPut('habitLog',(parsed.habitLog&&typeof parsed.habitLog==='object')?parsed.habitLog:{});
     await kvPut('habitAuto',(parsed.habitAuto&&typeof parsed.habitAuto==='object')?parsed.habitAuto:{});
     await kvPut('visionBoard',(typeof parsed.visionBoard==='string'&&parsed.visionBoard)?parsed.visionBoard:null);
+    await kvPut('sessions',Array.isArray(parsed.sessions)?parsed.sessions:[]);
+    await kvPut('activeSession',parsed.activeSession||null);
     // refresh in-memory state
     await loadDay();
     globalNotes=(await kvGet('notes'))||'';
@@ -1710,6 +1713,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
     const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
     try{var _vb=await kvGet('visionBoard');_visionShow(_vb||null);}catch(e){}
     syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();
+    if(typeof _sessInit==='function')await _sessInit();
     toast('Backup imported');
   }catch(e){toast('Import failed');}
 };
@@ -2990,7 +2994,1119 @@ function _visionPick(){document.getElementById('visionFile').click();}
   try{globalNotes=(await kvGet('notes'))||'';}catch(e){globalNotes='';}
   try{var vb=await kvGet('visionBoard');if(vb)_visionShow(vb);}catch(e){}
   try{await loadHabits();}catch(e){habits=[];habitLog={};habitAuto={};}
-  syncUI();renderGoals();renderNotes();render();tick();renderHabitsAll();})();
+  syncUI();renderGoals();renderNotes();render();tick();renderHabitsAll();
+  if(typeof _sessInit==='function')_sessInit();
+})();
+
+/* ============================================================
+   FOCUS SESSION MODULE — phase 1
+   ============================================================ */
+(function(){
+const SS_KEY='activeSession', HIST_KEY='sessions';
+let sess=null, hist=[];
+
+const css=document.createElement('style');
+css.textContent=`
+.sm-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:90;opacity:0;pointer-events:none;transition:opacity .25s ease;}
+.sm-bg.on{opacity:1;pointer-events:auto;}
+.sm{position:fixed;left:50%;top:50%;transform:translate(-50%,-44%) scale(.94);max-width:380px;width:calc(100% - 32px);
+  background:rgba(28,28,30,.96);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:22px 20px 18px;z-index:91;
+  opacity:0;pointer-events:none;transition:opacity .28s ease,transform .35s cubic-bezier(.22,1,.36,1);
+  max-height:84vh;display:flex;flex-direction:column;font-family:inherit;color:var(--text);}
+.sm.on{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto;}
+.sm h3{font-size:20px;font-weight:800;margin:0 0 5px;letter-spacing:-.4px;background:linear-gradient(180deg,#fff,rgba(235,235,245,.78));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.sm .sub{font-size:13px;color:var(--text-2);margin-bottom:14px;line-height:1.5;}
+.sm-quick{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:6px 0 10px;}
+.sm-quick button{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:var(--text);
+  padding:11px 4px;border-radius:13px;font-size:13.5px;cursor:pointer;font-family:inherit;font-weight:700;transition:transform .1s ease,background .15s ease;letter-spacing:-.2px;}
+.sm-quick button.on{background:linear-gradient(180deg,#3a98ff,#0a72e8);border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(10,132,255,.4);}
+.sm-quick button:active{transform:scale(.94);}
+.sm-min-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:13px;
+  padding:14px 16px;color:var(--text);font-size:17px;font-family:inherit;width:100%;font-variant-numeric:tabular-nums;font-weight:600;text-align:center;}
+.sm-min-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(10,132,255,.18);}
+.sm-end{background:linear-gradient(180deg,rgba(10,132,255,.18),rgba(10,132,255,.08));border:1px solid rgba(10,132,255,.32);border-radius:13px;
+  padding:13px 14px;font-size:14px;color:#9bc8ff;margin:12px 0 4px;text-align:center;font-weight:700;line-height:1.45;letter-spacing:.2px;font-variant-numeric:tabular-nums;}
+.sm-glist{flex:1;overflow-y:auto;max-height:42vh;margin:10px -4px 6px;padding:0 4px;}
+.sm-glist::-webkit-scrollbar{width:0;}
+.sm-g{display:flex;flex-direction:column;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.06);border-radius:13px;padding:9px 11px;margin-bottom:7px;gap:4px;}
+.sm-g.over{border-color:rgba(255,69,58,.45);background:rgba(255,69,58,.07);}
+.sm-g-row{display:flex;gap:8px;align-items:center;}
+.sm-g input[type=text]{flex:1;background:transparent;border:none;color:var(--text);font-size:14px;padding:4px 2px;font-family:inherit;font-weight:500;}
+.sm-g input[type=text]:focus{outline:none;}
+.sm-g input[type=text]::placeholder{color:var(--text-3);}
+.sm-g .sm-dl{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+  border-radius:9px;padding:5px 9px;}
+.sm-g .sm-dl input{width:42px;background:transparent;border:none;color:var(--text);font-size:13px;text-align:center;font-family:inherit;font-variant-numeric:tabular-nums;font-weight:700;}
+.sm-g .sm-dl input:focus{outline:none;}
+.sm-g .sm-dl span{font-size:10px;color:var(--text-3);font-weight:700;letter-spacing:.4px;}
+.sm-g .x{background:none;border:none;color:var(--text-3);font-size:20px;cursor:pointer;padding:0 4px;line-height:1;align-self:center;}
+.sm-g-time{font-size:10.5px;color:var(--text-3);font-weight:600;font-variant-numeric:tabular-nums;
+  padding:0 4px;letter-spacing:.2px;display:flex;justify-content:space-between;align-items:center;}
+.sm-g-time .sm-g-ord{color:var(--text-2);text-transform:uppercase;letter-spacing:.6px;font-size:9.5px;}
+.sm-totals{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 13px;margin:8px 0 4px;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);border-radius:12px;font-size:13px;font-weight:700;}
+.sm-totals .ok{color:#5ee577;}
+.sm-totals .over{color:#ff6b60;animation:smPulse 1s ease-in-out infinite;}
+.sm-totals .left{color:#ffb340;}
+.sm-totals .num{font-variant-numeric:tabular-nums;color:var(--text);font-weight:700;}
+.sm-totals .lbl{color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-size:10px;margin-right:auto;}
+@keyframes smPulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+.sm-add{background:rgba(10,132,255,.12);border:1px dashed rgba(10,132,255,.4);color:#7ab8ff;
+  border-radius:12px;padding:10px;width:100%;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600;margin-top:2px;}
+.sm-acts{display:flex;gap:9px;margin-top:16px;}
+.sm-acts button{flex:1;border:none;border-radius:14px;padding:15px 12px;font-size:15px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:transform .12s ease,box-shadow .2s ease;letter-spacing:-.1px;}
+.sm-acts .back{background:rgba(255,255,255,.07);color:var(--text);border:1px solid rgba(255,255,255,.08);}
+.sm-acts .next{background:linear-gradient(180deg,#3a98ff,#0a72e8);color:#fff;box-shadow:0 10px 26px rgba(10,132,255,.45),inset 0 1px 0 rgba(255,255,255,.2);flex:1.4;}
+.sm-acts .danger{background:linear-gradient(180deg,#ff5b50,#d6352b);color:#fff;box-shadow:0 10px 26px rgba(255,69,58,.4);flex:1.4;}
+.sm-acts button:active{transform:scale(.96);}
+.sess-board{margin:14px 0 6px;display:none;}
+.sess-board.on{display:block;animation:sbIn .35s cubic-bezier(.22,1,.36,1);}
+@keyframes sbIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.sess-board{margin:14px 0 6px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 30px rgba(0,0,0,.25);}
+.sb-head{display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  font-size:12px;color:var(--text-2);font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
+.sb-head .sb-end{color:var(--blue);font-variant-numeric:tabular-nums;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:800;}
+.sb-list{padding:8px;}
+.sb-empty{text-align:center;padding:18px;color:var(--text-3);font-size:13px;}
+.sb-goal{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:12px;
+  background:rgba(255,255,255,.035);margin-bottom:6px;transition:background .3s ease,border-color .3s ease,opacity .3s ease;
+  border:1px solid rgba(255,255,255,.05);position:relative;overflow:hidden;}
+.sb-goal:last-child{margin-bottom:0;}
+.sb-goal.done{opacity:.62;background:rgba(48,209,88,.05);border-color:rgba(48,209,88,.15);}
+.sb-goal.done .sbg-text{text-decoration:line-through;color:var(--text-2);}
+.sb-goal.done .sbg-eta{background:rgba(48,209,88,.18);color:#5ee577;border:1px solid rgba(48,209,88,.25);}
+.sb-goal.late{background:rgba(255,69,58,.1);border-color:rgba(255,69,58,.38);animation:sbPulse 1.4s ease-in-out infinite;}
+.sb-goal.late .sbg-eta{background:rgba(255,69,58,.22);color:#ff8a82;border:1px solid rgba(255,69,58,.4);font-weight:900;}
+.sb-goal.urgent:not(.current){background:rgba(255,159,10,.08);border-color:rgba(255,159,10,.3);}
+.sb-goal.urgent:not(.current) .sbg-eta{background:rgba(255,159,10,.18);color:#ffb340;border:1px solid rgba(255,159,10,.3);}
+.sb-goal.current{background:rgba(10,132,255,.07);border-color:rgba(10,132,255,.35);box-shadow:0 0 0 1px rgba(10,132,255,.15),0 4px 18px rgba(10,132,255,.18);}
+.sb-goal.current::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--prog,0) * 100%);
+  background:linear-gradient(90deg,rgba(10,132,255,.22),rgba(10,132,255,.08));pointer-events:none;
+  transition:width .9s linear;border-right:2px solid rgba(10,132,255,.7);box-shadow:0 0 14px rgba(10,132,255,.5);}
+.sb-goal.current::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(10,132,255,.85),transparent);
+  animation:sbScan 2.2s ease-in-out infinite;pointer-events:none;}
+@keyframes sbScan{0%,100%{opacity:.4;}50%{opacity:1;}}
+.sb-goal.current>*{position:relative;z-index:1;}
+.sb-goal.current .sbg-eta{background:rgba(10,132,255,.22);color:#9bc8ff;border:1px solid rgba(10,132,255,.35);}
+.sb-goal.current.late{background:rgba(255,69,58,.08);border-color:rgba(255,69,58,.45);}
+.sb-goal.current.late::before{background:linear-gradient(90deg,rgba(255,69,58,.28),rgba(255,69,58,.1));border-right-color:rgba(255,69,58,.75);box-shadow:0 0 14px rgba(255,69,58,.5);}
+.sbg-ord{flex:none;width:24px;height:24px;border-radius:8px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:var(--text-2);font-variant-numeric:tabular-nums;letter-spacing:-.3px;}
+.sb-goal.current .sbg-ord{background:rgba(10,132,255,.25);border-color:rgba(10,132,255,.5);color:#9bc8ff;}
+.sb-goal.done .sbg-ord{background:rgba(48,209,88,.18);border-color:rgba(48,209,88,.25);color:#5ee577;}
+.sb-goal.late .sbg-ord{background:rgba(255,69,58,.22);border-color:rgba(255,69,58,.35);color:#ff8a82;}
+@keyframes sbPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,.4);}50%{box-shadow:0 0 0 6px rgba(255,69,58,0);}}
+.sbg-check{width:24px;height:24px;border:1.8px solid var(--text-3);border-radius:8px;flex:none;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.18s;
+  background:rgba(255,255,255,.02);}
+.sbg-check:active{transform:scale(.88);}
+.sbg-check.on{background:linear-gradient(180deg,#3ddf6b,#1fb84a);border-color:#1fb84a;box-shadow:0 4px 10px rgba(48,209,88,.35);}
+.sbg-check.on::after{content:"✓";color:#fff;font-size:14px;font-weight:900;line-height:1;}
+.sbg-mid{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0;}
+.sbg-text{font-size:14.5px;letter-spacing:-.2px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sbg-time{font-size:10.5px;color:var(--text-3);font-variant-numeric:tabular-nums;font-weight:600;letter-spacing:.2px;}
+.sb-goal.done .sbg-time{color:var(--text-3);}
+.sb-goal.late .sbg-time{color:#ff8a82;}
+.sb-goal.current .sbg-time{color:#9bc8ff;}
+.sbg-eta{font-size:11px;font-variant-numeric:tabular-nums;font-weight:800;white-space:nowrap;
+  background:rgba(255,255,255,.06);color:var(--text-2);border:1px solid rgba(255,255,255,.08);
+  padding:5px 10px;border-radius:10px;align-self:center;letter-spacing:.2px;}
+.sess-meta{text-align:center;font-size:12.5px;color:var(--text-2);margin:12px 0 0;font-weight:600;display:none;letter-spacing:-.1px;}
+.sess-meta.on{display:flex;justify-content:center;align-items:center;gap:9px;flex-wrap:wrap;}
+.sess-meta .sm-time{font-variant-numeric:tabular-nums;}
+.sess-meta .sm-dot{color:var(--text-3);}
+.focus-pill{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(48,209,88,.22),rgba(48,209,88,.1));border:1px solid rgba(48,209,88,.35);color:#5ee577;
+  font-size:12px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.5px;
+  box-shadow:0 4px 12px rgba(48,209,88,.18);}
+.focus-pill.med{background:linear-gradient(180deg,rgba(255,159,10,.22),rgba(255,159,10,.1));border-color:rgba(255,159,10,.35);color:#ffb340;box-shadow:0 4px 12px rgba(255,159,10,.18);}
+.focus-pill.low{background:linear-gradient(180deg,rgba(255,69,58,.22),rgba(255,69,58,.1));border-color:rgba(255,69,58,.35);color:#ff6b60;box-shadow:0 4px 12px rgba(255,69,58,.18);}
+.distract-btn{display:none;margin:12px auto 0;padding:10px 18px;border:1px solid rgba(255,69,58,.35);
+  background:rgba(255,69,58,.08);color:#ff6b60;border-radius:14px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;letter-spacing:-.1px;align-items:center;gap:7px;transition:.15s;}
+.distract-btn.on{display:inline-flex;}
+.distract-btn:active{transform:scale(.92);background:rgba(255,69,58,.22);}
+.distract-btn svg{width:14px;height:14px;transition:transform .25s ease;}
+.distract-btn:active svg{transform:rotate(-15deg) scale(1.15);}
+.distract-flash{animation:dFlash .55s ease;}
+@keyframes dFlash{0%{box-shadow:0 0 0 0 rgba(255,69,58,.6);}100%{box-shadow:0 0 0 20px rgba(255,69,58,0);}}
+`;
+document.head.appendChild(css);
+
+function mk(html){const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstElementChild;}
+const $=(id)=>document.getElementById(id);
+
+const mBg=mk('<div class="sm-bg" id="smBg"></div>'); document.body.appendChild(mBg);
+const m1=mk('<div class="sm" id="sm1" role="dialog">'+
+  '<h3>How long will you focus?</h3>'+
+  '<div class="sub">Pick a session length. You\'ll see your end time and add goals next.</div>'+
+  '<div class="sm-quick" id="smQuick">'+
+    '<button data-m="25">25m</button><button data-m="50">50m</button>'+
+    '<button data-m="75">75m</button><button data-m="90">90m</button>'+
+    '<button data-m="120">2h</button>'+
+  '</div>'+
+  '<input class="sm-min-input num" id="smMin" type="number" min="5" max="480" placeholder="Minutes" inputmode="numeric">'+
+  '<div class="sm-end" id="smEnd">—</div>'+
+  '<div class="sm-acts"><button class="back" id="sm1Cancel">Cancel</button><button class="next" id="sm1Next">Next</button></div>'+
+  '</div>');
+document.body.appendChild(m1);
+
+const m2=mk('<div class="sm" id="sm2" role="dialog">'+
+  '<h3>Goals for this session</h3>'+
+  '<div class="sub" id="sm2Sub">Add what you want to finish. Deadline = minutes from session start (optional).</div>'+
+  '<div class="sm-glist" id="smGList"></div>'+
+  '<button class="sm-add" id="smAddG">+ Add goal</button>'+
+  '<div class="sm-acts"><button class="back" id="sm2Back">Back</button><button class="next" id="sm2Start">Start session</button></div>'+
+  '</div>');
+document.body.appendChild(m2);
+
+const stopBg=mk('<div class="sm-bg" id="stopBg"></div>'); document.body.appendChild(stopBg);
+const stopMod=mk('<div class="sm" id="stopMod" role="dialog">'+
+  '<h3>Stop session?</h3>'+
+  '<div class="sub" id="stopSub">Timer paused. Stopping clears incomplete goals — focused time and done goals are saved.</div>'+
+  '<div class="sm-acts"><button class="back" id="stopResume">Resume</button><button class="danger" id="stopConfirm">Stop session</button></div>'+
+  '</div>');
+document.body.appendChild(stopMod);
+
+const tv=document.getElementById('timerView');
+const pager=tv.querySelector('.widget-pager');
+const board=mk('<div class="sess-board" id="sessBoard">'+
+  '<div class="sb-head"><span id="sbHeadL">Session</span><span class="sb-end" id="sbHeadR"></span></div>'+
+  '<div class="sb-list" id="sbList"></div></div>');
+tv.insertBefore(board, pager);
+
+const heroCtrl=tv.querySelector('.controls');
+const metaEl=mk('<div class="sess-meta" id="sessMeta"></div>');
+heroCtrl.parentNode.insertBefore(metaEl, heroCtrl.nextSibling);
+
+const dBtn=mk('<button class="distract-btn" id="distractBtn">'+
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>'+
+  'I got distracted</button>');
+heroCtrl.parentNode.insertBefore(dBtn, metaEl.nextSibling);
+
+function fmtClock(d){let h=d.getHours();const m=d.getMinutes();const ap=h>=12?'PM':'AM';h=h%12;if(!h)h=12;return h+':'+String(m).padStart(2,'0')+' '+ap;}
+function fmtDur(min){min=Math.max(0,Math.round(min));if(min<60)return min+'m';const h=Math.floor(min/60),mm=min%60;return mm?h+'h '+mm+'m':h+'h';}
+function elapsedMin(){if(!sess)return 0;const now=Date.now();const frozen=sess.stopPendingAt?(now-sess.stopPendingAt):0;const ms=(now-sess.startMs)-(sess.pausedTotal||0)-frozen;return Math.max(0,ms/60000);}
+function totalPlanMin(){return (sess?sess.planMin:0)+(sess?(sess.extMin||0):0);}
+function scheduleGoals(){
+  if(!sess)return;
+  let cur=0;
+  const em=elapsedMin();
+  const firstIncomplete=sess.goals.findIndex(g=>g.doneAt==null);
+  sess.goals.forEach((g,i)=>{
+    g._start=cur;
+    g._end=cur+(g.planMin||0); // original planned end — kept for late detection
+    if(g.doneAt!=null){
+      const doneAtMin=(g.doneAt-sess.startMs-(sess.pausedTotal||0))/60000;
+      cur=Math.max(cur,doneAtMin);
+    } else if(i===firstIncomplete && em>g._end){
+      cur=em; // push followers but DON'T overwrite g._end (keep late state)
+    } else {
+      cur=g._end;
+    }
+  });
+  // dynamic extension: shrinks back when user catches up, floor 0
+  if(sess.goals.length){
+    const needed=Math.max(0,Math.ceil(cur-(sess.planMin||0)));
+    if(needed!==(sess.extMin||0)){
+      sess.extMin=needed;
+      persist();
+    }
+  }
+}
+function focusScore(){
+  if(!sess||!sess.goals.length)return null;
+  const done=sess.goals.filter(g=>g.doneAt!=null).length;
+  const total=sess.goals.length;
+  const dist=(sess.distractions||[]).length;
+  const em=elapsedMin();
+  let overdue=0;
+  sess.goals.forEach(g=>{if(g.doneAt==null && g._end!=null && em>g._end)overdue++;});
+  // base = goal completion rate
+  const ratio=total>0?done/total:0;
+  // partial credit for time invested toward incomplete goals
+  const plan=totalPlanMin();
+  const timeRatio=plan>0?Math.min(1,em/plan):0;
+  // blend: 70% goals + 30% time
+  let core=ratio*0.7 + timeRatio*0.3;
+  // distraction penalty: each = -5%, cap 40%
+  const distPen=Math.min(0.4,dist*0.05);
+  // overdue penalty: each = -8%, cap 30%
+  const latePen=Math.min(0.3,overdue*0.08);
+  let s=core*(1-distPen-latePen)*100;
+  s=Math.round(s);if(s<0)s=0;if(s>100)s=100;
+  return s;
+}
+
+async function persist(){try{await kvPut(SS_KEY,sess||null);}catch(e){}}
+async function loadSess(){try{sess=(await kvGet(SS_KEY))||null;}catch(e){sess=null;}}
+async function loadHist(){try{hist=(await kvGet(HIST_KEY))||[];}catch(e){hist=[];}}
+async function saveHist(){try{await kvPut(HIST_KEY,hist);}catch(e){}}
+
+function renderBoard(){
+  if(!sess){board.classList.remove('on');metaEl.classList.remove('on');dBtn.classList.remove('on');return;}
+  scheduleGoals();
+  board.classList.add('on');
+  dBtn.classList.add('on');
+  const endTs=sess.startMs+totalPlanMin()*60000;
+  $('sbHeadL').textContent=(sess.stopPendingAt?'Paused · ':'')+fmtDur(totalPlanMin())+' session';
+  $('sbHeadR').textContent='ends '+fmtClock(new Date(endTs));
+  const list=$('sbList');
+  list.innerHTML='';
+  if(!sess.goals.length){
+    const e=document.createElement('div');e.className='sb-empty';e.textContent='No goals — stop session to start a new one.';list.appendChild(e);
+  } else {
+    const em=elapsedMin();
+    const baseMs=sess.startMs;
+    const curIdx=sess.goals.findIndex(x=>x.doneAt==null);
+    sess.goals.forEach((g,i)=>{
+      const isDone=g.doneAt!=null;
+      const dl=g._end;
+      const late=!isDone && dl!=null && em>dl;
+      const urgent=!isDone && dl!=null && em>dl-3 && em<=dl;
+      const isCur=i===curIdx && !sess.stopPendingAt;
+      const row=document.createElement('div');
+      row.className='sb-goal'+(isDone?' done':'')+(late?' late':'')+(urgent?' urgent':'')+(isCur?' current':'');
+      if(isCur){
+        const span=Math.max(1,g.planMin||1);
+        const prog=Math.max(0,Math.min(1,(em-(g._start||0))/span));
+        row.style.setProperty('--prog',prog.toFixed(4));
+      }
+      let etaTxt='';
+      if(isDone){
+        const dm=(g.doneAt-sess.startMs-(sess.pausedTotal||0))/60000;
+        etaTxt='done @'+fmtDur(Math.round(dm));
+      } else if(dl!=null){
+        const left=Math.round(dl-em);
+        etaTxt=left>=0?(fmtDur(left)+' left'):('+'+fmtDur(-left)+' over');
+      }
+      const startClock=fmtClock(new Date(baseMs+(g._start||0)*60000));
+      const endClock=fmtClock(new Date(baseMs+(g._end||0)*60000));
+      const check=document.createElement('div');check.className='sbg-check'+(isDone?' on':'');check.onclick=()=>toggleGoal(i);
+      const ord=document.createElement('div');ord.className='sbg-ord';ord.textContent=(i+1);
+      const mid=document.createElement('div');mid.className='sbg-mid';
+      const txt=document.createElement('div');txt.className='sbg-text';txt.textContent=g.text;
+      const tm=document.createElement('div');tm.className='sbg-time';tm.textContent=startClock+' → '+endClock+' · '+fmtDur(g.planMin||0);
+      mid.appendChild(txt);mid.appendChild(tm);
+      const eta=document.createElement('div');eta.className='sbg-eta';eta.textContent=etaTxt;
+      row.appendChild(check);row.appendChild(ord);row.appendChild(mid);row.appendChild(eta);
+      list.appendChild(row);
+    });
+  }
+  renderMeta();
+}
+function renderMeta(){
+  if(!sess){metaEl.classList.remove('on');return;}
+  metaEl.classList.add('on');
+  const fs=focusScore();
+  const dist=(sess.distractions||[]).length;
+  let html='<span class="sm-time">'+fmtDur(Math.round(elapsedMin()))+' / '+fmtDur(totalPlanMin())+'</span>';
+  if(dist) html+='<span class="sm-dot">·</span><span>'+dist+' distract'+(dist===1?'':'s')+'</span>';
+  if(fs!=null){
+    const cls=fs>=70?'':(fs>=40?' med':' low');
+    html+='<span class="focus-pill'+cls+'">FOCUS '+fs+'</span>';
+  }
+  metaEl.innerHTML=html;
+}
+
+function checkOverflow(){
+  if(!sess||sess.stopPendingAt)return;
+  // ext now driven by scheduleGoals (dynamic shrink-back). Just toast when ext active.
+  if((sess.extMin||0)>0 && !sess._extToast){
+    sess._extToast=true;
+    toast('Session extended — finish your goals');
+    setTimeout(()=>{if(sess)sess._extToast=false;},25000);
+  } else if((sess.extMin||0)===0 && sess._extToast){
+    sess._extToast=false;
+  }
+}
+
+function _pushTodayGoal(g){
+  if(g.todayGoalId)return;
+  const id=Date.now()+'-'+Math.random().toString(36).slice(2,8);
+  g.todayGoalId=id;
+  state.goals.push({id,text:g.text,done:true});
+  save();renderGoals();
+}
+function _removeTodayGoal(g){
+  if(!g.todayGoalId)return;
+  state.goals=state.goals.filter(x=>x.id!==g.todayGoalId);
+  g.todayGoalId=null;
+  save();renderGoals();
+}
+
+async function toggleGoal(i){
+  if(!sess)return;
+  const g=sess.goals[i];
+  if(g.doneAt!=null){
+    g.doneAt=null;
+    _removeTodayGoal(g);
+  } else {
+    g.doneAt=Date.now();
+    _pushTodayGoal(g);
+  }
+  await persist();
+  renderBoard();
+  const allDone=sess.goals.length && sess.goals.every(x=>x.doneAt!=null);
+  const em=elapsedMin();
+  if(allDone && em<totalPlanMin()-2 && !sess._addMoreShown){
+    sess._addMoreShown=true;
+    setTimeout(()=>{if(sess && sess.goals.every(x=>x.doneAt!=null))promptAddMore();},400);
+  }
+}
+
+async function promptAddMore(){
+  const left=Math.max(0,Math.round(totalPlanMin()-elapsedMin()));
+  const v=await appConfirm({title:'All goals done! 🎯',body:'You have '+fmtDur(left)+' left. Add more goals to boost your score, or end now (small focus penalty).',okText:'Add more',danger:false});
+  if(v){ openGoalsModal(true); }
+  else {
+    // end early with penalty
+    const remainPct=Math.max(0,(totalPlanMin()-elapsedMin())/totalPlanMin());
+    sess._earlyPenalty=Math.round(remainPct*15);
+    toast('Session ended early — -'+sess._earlyPenalty+' focus');
+    await finishSession(true);
+  }
+}
+
+let draftMin=50, draftGoals=[];
+function openDurModal(){
+  m1.classList.add('on');mBg.classList.add('on');
+  draftMin=50; $('smMin').value=50;
+  $('smQuick').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.m===50));
+  updateEnd();
+}
+function closeAll(){m1.classList.remove('on');m2.classList.remove('on');mBg.classList.remove('on');}
+function updateEnd(){
+  const m=+$('smMin').value||0;
+  if(m<5){$('smEnd').textContent='Pick at least 5 minutes';return;}
+  const start=new Date();
+  const end=new Date(start.getTime()+m*60000);
+  $('smEnd').textContent=fmtClock(start)+'  →  '+fmtClock(end);
+}
+$('smQuick').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    $('smQuick').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    $('smMin').value=b.dataset.m;
+    draftMin=+b.dataset.m;
+    updateEnd();
+  };
+});
+$('smMin').oninput=()=>{
+  draftMin=+$('smMin').value||0;
+  $('smQuick').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.m===draftMin));
+  updateEnd();
+};
+$('sm1Cancel').onclick=closeAll;
+mBg.onclick=()=>{}; /* explicit cancel only — prevent accidental dismiss */
+$('sm1Next').onclick=()=>{
+  if(draftMin<5){toast('Minimum 5 minutes');return;}
+  m1.classList.remove('on');
+  draftGoals=[blankGoal()];
+  draftBudgetMin=draftMin;
+  draftStartMs=Date.now();
+  autoBalance();
+  openGoalsModal(false);
+};
+
+function blankGoal(){return {text:'',planMin:0,_set:false};}
+
+let draftBudgetMin=50, draftStartMs=0;
+
+function autoBalance(){
+  const total=draftBudgetMin;
+  if(!draftGoals.length)return;
+  const setSum=draftGoals.filter(g=>g._set).reduce((s,g)=>s+(g.planMin||0),0);
+  const unset=draftGoals.filter(g=>!g._set);
+  if(!unset.length){return;}
+  let rem=total-setSum;
+  if(rem<0)rem=0;
+  const per=Math.floor(rem/unset.length);
+  let extra=rem-per*unset.length;
+  unset.forEach(g=>{g.planMin=per+(extra>0?1:0);if(extra>0)extra--;});
+}
+function sumPlan(){return draftGoals.reduce((s,g)=>s+(g.planMin||0),0);}
+
+function openGoalsModal(addingMore){
+  m2.classList.add('on');mBg.classList.add('on');
+  if(addingMore){
+    draftBudgetMin=Math.max(1,Math.round(totalPlanMin()-elapsedMin()));
+    draftStartMs=Date.now();
+    draftGoals=[blankGoal()];
+    autoBalance();
+  }
+  const startTxt=fmtClock(new Date(draftStartMs));
+  const endTxt=fmtClock(new Date(draftStartMs+draftBudgetMin*60000));
+  $('sm2Sub').innerHTML=(addingMore?'Add more goals to fill remaining time. ':'Allocate minutes to each goal — totals must fit inside the session. ')+
+    '<b style="color:#7ab8ff">'+startTxt+' → '+endTxt+'</b> ('+fmtDur(draftBudgetMin)+')';
+  $('sm2Start').textContent=addingMore?'Resume session':'Start session';
+  $('sm2Back').textContent=addingMore?'Cancel':'Back';
+  renderDraftGoals();
+}
+function renderDraftGoals(){
+  autoBalance();
+  const wrap=$('smGList');
+  wrap.innerHTML='';
+  let cur=0;
+  draftGoals.forEach((g,i)=>{
+    const row=mk('<div class="sm-g">'+
+      '<div class="sm-g-row">'+
+        '<input type="text" maxlength="100" placeholder="Goal '+(i+1)+'">'+
+        '<div class="sm-dl"><input type="number" min="1" max="999" inputmode="numeric"><span>MIN</span></div>'+
+        '<button class="x" aria-label="Remove">×</button>'+
+      '</div>'+
+      '<div class="sm-g-time"><span class="sm-g-ord">#'+(i+1)+'</span><span class="sm-g-clock"></span></div>'+
+      '</div>');
+    const ti=row.querySelector('input[type=text]');
+    const di=row.querySelector('input[type=number]');
+    const clk=row.querySelector('.sm-g-clock');
+    ti.value=g.text||''; di.value=g.planMin||'';
+    const start=new Date(draftStartMs+cur*60000);
+    const end=new Date(draftStartMs+(cur+(g.planMin||0))*60000);
+    clk.textContent=fmtClock(start)+' → '+fmtClock(end);
+    cur+=(g.planMin||0);
+    ti.oninput=()=>{g.text=ti.value;};
+    di.oninput=()=>{g.planMin=Math.max(1,+di.value||0);g._set=true;updateTotalsAndClocks();};
+    row.querySelector('.x').onclick=()=>{
+      draftGoals.splice(i,1);
+      if(!draftGoals.length)draftGoals=[blankGoal()];
+      renderDraftGoals();
+    };
+    wrap.appendChild(row);
+  });
+  // totals pill
+  const tot=document.createElement('div');tot.className='sm-totals';tot.id='smTotals';
+  wrap.appendChild(tot);
+  updateTotalsAndClocks();
+}
+function updateTotalsAndClocks(){
+  const rows=$('smGList').querySelectorAll('.sm-g');
+  let cur=0;
+  draftGoals.forEach((g,i)=>{
+    const row=rows[i];if(!row)return;
+    const clk=row.querySelector('.sm-g-clock');
+    const start=new Date(draftStartMs+cur*60000);
+    const end=new Date(draftStartMs+(cur+(g.planMin||0))*60000);
+    if(clk)clk.textContent=fmtClock(start)+' → '+fmtClock(end);
+    cur+=(g.planMin||0);
+    row.classList.toggle('over', cur>draftBudgetMin);
+  });
+  const sum=sumPlan();
+  const diff=draftBudgetMin-sum;
+  const t=$('smTotals');if(!t)return;
+  let html='<span class="lbl">Allocated</span><span class="num">'+fmtDur(sum)+' / '+fmtDur(draftBudgetMin)+'</span>';
+  if(diff===0) html+='<span class="ok">✓ perfect</span>';
+  else if(diff>0) html+='<span class="left">'+fmtDur(diff)+' free</span>';
+  else html+='<span class="over">+'+fmtDur(-diff)+' over</span>';
+  t.innerHTML=html;
+  const btn=$('sm2Start');
+  if(sum>draftBudgetMin){btn.style.opacity='.55';btn.style.filter='grayscale(.5)';}
+  else{btn.style.opacity='1';btn.style.filter='none';}
+}
+$('smAddG').onclick=()=>{
+  draftGoals.push(blankGoal());
+  autoBalance();
+  renderDraftGoals();
+  const inps=$('smGList').querySelectorAll('input[type=text]');
+  if(inps.length)inps[inps.length-1].focus();
+};
+$('sm2Back').onclick=()=>{
+  if(sess){closeAll();return;}
+  m2.classList.remove('on');m1.classList.add('on');mBg.classList.add('on');
+};
+async function _startSessionFromDraft(){
+  try{
+    const sum=sumPlan();
+    if(sum>draftBudgetMin){toast('Goals exceed session length');return;}
+    let goals=draftGoals.filter(g=>g.text && g.text.trim());
+    if(!goals.length){toast('Add at least one goal');return;}
+    const leftover=draftBudgetMin-goals.reduce((s,g)=>s+(g.planMin||0),0);
+    if(leftover>0 && goals.length) goals[goals.length-1].planMin=(goals[goals.length-1].planMin||0)+leftover;
+    goals=goals.map(g=>({
+      id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
+      text:g.text.trim(),
+      planMin:Math.max(1,Math.round(g.planMin||1)),
+      doneAt:null,
+      todayGoalId:null,
+    }));
+    if(sess){
+      sess.goals.push(...goals);
+      sess._addMoreShown=false;
+      if(sess.stopPendingAt){
+        sess.pausedTotal=(sess.pausedTotal||0)+(Date.now()-sess.stopPendingAt);
+        sess.stopPendingAt=null;
+      }
+      await persist();
+      closeAll();
+      if(!state.running) startTimer();
+      renderBoard();
+      return;
+    }
+    sess={
+      id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
+      startMs:Date.now(),
+      planMin:draftBudgetMin,
+      extMin:0, pausedTotal:0, stopPendingAt:null,
+      goals:goals, distractions:[],
+    };
+    await persist();
+    closeAll();
+    startTimer();
+    renderBoard();
+  }catch(e){
+    console.error('start session err',e);
+    toast('Error: '+(e&&e.message?e.message:'start failed'));
+  }
+}
+$('sm2Start').onclick=_startSessionFromDraft;
+$('sm2Start').addEventListener('touchend',function(ev){ev.preventDefault();_startSessionFromDraft();},{passive:false});
+
+function startTimer(){
+  if(!state.running){
+    state.startTs=performance.now(); state.running=true;
+    syncUI(); save();
+    if(typeof _refreshAutoChips==='function')_refreshAutoChips();
+  }
+}
+function pauseTimer(){
+  if(state.running){
+    state.elapsed=currentMs(); state.running=false;
+    save(); syncUI();
+    if(typeof _refreshAutoChips==='function')_refreshAutoChips();
+  }
+}
+
+function openStop(){
+  if(!sess)return;
+  if(!sess.stopPendingAt){
+    sess.stopPendingAt=Date.now();
+    pauseTimer();
+    persist();
+  }
+  const done=sess.goals.filter(g=>g.doneAt!=null).length;
+  const left=sess.goals.length-done;
+  $('stopSub').textContent='Timer paused. '+(left>0?('You\'ll miss out on '+left+' incomplete goal'+(left===1?'':'s')+'. '):'')+'Focused time and done goals are saved either way.';
+  stopMod.classList.add('on');stopBg.classList.add('on');
+  renderBoard();
+}
+function closeStop(){stopMod.classList.remove('on');stopBg.classList.remove('on');}
+$('stopResume').onclick=async()=>{
+  if(!sess)return;
+  if(sess.stopPendingAt){
+    sess.pausedTotal=(sess.pausedTotal||0)+(Date.now()-sess.stopPendingAt);
+    sess.stopPendingAt=null;
+    await persist();
+  }
+  closeStop();
+  startTimer();
+  renderBoard();
+};
+$('stopConfirm').onclick=async()=>{
+  if(!sess)return;
+  await finishSession(true);
+  closeStop();
+};
+
+async function finishSession(stoppedEarly){
+  if(!sess)return;
+  if(sess.stopPendingAt){
+    sess.pausedTotal=(sess.pausedTotal||0)+(Date.now()-sess.stopPendingAt);
+    sess.stopPendingAt=null;
+  }
+  const focused=elapsedMin();
+  let fs=focusScore()||0;
+  const penalty=sess._earlyPenalty||0;
+  fs=Math.max(0,fs-penalty);
+  const rec={
+    id:sess.id, date:todayKey(),
+    startMs:sess.startMs, endMs:Date.now(),
+    plannedMin:sess.planMin, extMin:sess.extMin||0,
+    focusedMin:Math.round(focused),
+    goalsTotal:sess.goals.length,
+    goalsDone:sess.goals.filter(g=>g.doneAt!=null).length,
+    distractions:(sess.distractions||[]).length,
+    focusScore:fs,
+    earlyPenalty:penalty,
+    stoppedEarly:!!stoppedEarly,
+  };
+  await loadHist();
+  hist.push(rec);
+  await saveHist();
+  pauseTimer();
+  sess=null;
+  await persist();
+  renderBoard();
+  toast(stoppedEarly?('Session stopped — '+rec.goalsDone+'/'+rec.goalsTotal+' goals'):'Session complete!');
+}
+
+dBtn.onclick=async()=>{
+  if(!sess)return;
+  sess.distractions.push(Date.now());
+  await persist();
+  dBtn.classList.remove('distract-flash');void dBtn.offsetWidth;dBtn.classList.add('distract-flash');
+  toast('Logged — refocus');
+  renderBoard();
+};
+
+const oldPlay=document.getElementById('playBtn');
+oldPlay.onclick=()=>{
+  if(sess){ openStop(); return; }
+  openDurModal();
+};
+
+window._sessInit=async function(){
+  await loadSess();
+  await loadHist();
+  if(sess && (!sess.goals || !sess.goals.length || !sess.startMs)){
+    sess=null; await persist();
+  }
+  if(sess){
+    renderBoard();
+    if(sess.stopPendingAt){
+      pauseTimer();
+      openStop();
+    } else {
+      if(!state.running) startTimer();
+    }
+  }
+};
+
+setInterval(()=>{
+  if(!sess)return;
+  checkOverflow();
+  renderBoard();
+},1000);
+
+window._chronosSession={get:()=>sess,hist:()=>hist,end:finishSession};
+
+/* ================= STATS INTEGRATION ================= */
+const focusCSS=document.createElement('style');
+focusCSS.textContent=`
+.focus-card{margin-top:18px;animation:facIn .5s cubic-bezier(.22,1,.36,1);}
+@keyframes facIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.focus-tile{transition:transform .25s ease,box-shadow .25s ease;}
+.focus-tile:active{transform:scale(.98);}
+.focus-tile .ft-v{transition:color .3s ease;}
+.fc-bar{transition:height .8s cubic-bezier(.22,1,.36,1),background .3s ease;}
+.fa-row{animation:faRowIn .35s cubic-bezier(.22,1,.36,1);}
+@keyframes faRowIn{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:translateX(0);}}
+.focus-info{margin-top:18px;animation:facIn .55s cubic-bezier(.22,1,.36,1);}
+.fi-formula{background:linear-gradient(180deg,rgba(10,132,255,.08),rgba(10,132,255,.02));
+  border:1px solid rgba(10,132,255,.18);border-radius:13px;padding:12px 14px;margin:8px 0 10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.65;
+  color:#9bc8ff;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
+.fi-formula b{color:#fff;font-weight:700;}
+.fi-rows{display:flex;flex-direction:column;gap:6px;margin:8px 0;}
+.fi-row{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.05);border-radius:11px;font-size:12.5px;line-height:1.4;}
+.fi-row .fi-ic{flex:none;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;}
+.fi-row .fi-ic.g{background:rgba(48,209,88,.18);color:#5ee577;border:1px solid rgba(48,209,88,.3);}
+.fi-row .fi-ic.b{background:rgba(10,132,255,.18);color:#7ab8ff;border:1px solid rgba(10,132,255,.3);}
+.fi-row .fi-ic.r{background:rgba(255,69,58,.18);color:#ff8a82;border:1px solid rgba(255,69,58,.3);}
+.fi-row .fi-ic.a{background:rgba(255,159,10,.18);color:#ffb340;border:1px solid rgba(255,159,10,.3);}
+.fi-row .fi-mid{flex:1;color:var(--text-2);}
+.fi-row .fi-mid b{color:var(--text);font-weight:700;}
+.fi-tips{margin-top:14px;}
+
+/* ============ STATS PAGE ANIMATIONS ============ */
+#statsView.sv-anim .stats-group{animation:svGroupIn .55s cubic-bezier(.22,1,.36,1) backwards;}
+#statsView.sv-anim .widget-pager .stats-group:nth-child(1){animation-delay:.02s;}
+#statsView.sv-anim .widget-pager .stats-group:nth-child(2){animation-delay:.08s;}
+#statsView.sv-anim .widget-pager .stats-group:nth-child(3){animation-delay:.14s;}
+@keyframes svGroupIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+#statsView.sv-anim .stat{animation:svStatIn .5s cubic-bezier(.22,1,.36,1) backwards;}
+#statsView.sv-anim .stat:nth-child(1){animation-delay:.1s;}
+#statsView.sv-anim .stat:nth-child(2){animation-delay:.18s;}
+#statsView.sv-anim .stat:nth-child(3){animation-delay:.26s;}
+@keyframes svStatIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.stat{position:relative;overflow:hidden;}
+.stat::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 0%,rgba(255,255,255,.07),transparent 60%);pointer-events:none;opacity:0;transition:opacity .4s ease;}
+.stat:hover::before,.stat:active::before{opacity:1;}
+.stat .v{transition:transform .25s ease;}
+.stat:active{transform:scale(.98);}
+.stat:active .v{transform:scale(1.06);}
+.col .bar{transition:height .9s cubic-bezier(.22,1,.36,1);}
+.col{animation:colIn .5s cubic-bezier(.22,1,.36,1) backwards;}
+#statsView.sv-anim .col:nth-child(1){animation-delay:.15s;}
+#statsView.sv-anim .col:nth-child(2){animation-delay:.19s;}
+#statsView.sv-anim .col:nth-child(3){animation-delay:.23s;}
+#statsView.sv-anim .col:nth-child(4){animation-delay:.27s;}
+#statsView.sv-anim .col:nth-child(5){animation-delay:.31s;}
+#statsView.sv-anim .col:nth-child(6){animation-delay:.35s;}
+#statsView.sv-anim .col:nth-child(7){animation-delay:.39s;}
+@keyframes colIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.col.is-today .bar{box-shadow:0 0 14px rgba(10,132,255,.6);animation:colPulse 2.4s ease-in-out infinite;}
+@keyframes colPulse{0%,100%{box-shadow:0 0 12px rgba(10,132,255,.45);}50%{box-shadow:0 0 20px rgba(10,132,255,.75);}}
+#statsView.sv-anim .cell{animation:cellIn .35s cubic-bezier(.22,1,.36,1) backwards;}
+@keyframes cellIn{from{opacity:0;transform:scale(.5);}to{opacity:1;transform:scale(1);}}
+.cell{transition:transform .15s ease,box-shadow .25s ease;}
+.cell:hover,.cell:active{transform:scale(1.18);z-index:2;box-shadow:0 4px 10px rgba(0,0,0,.4);}
+.day-card{transition:transform .2s ease,background .25s ease;}
+.day-card:active{transform:scale(.98);background:rgba(255,255,255,.05);}
+#statsView.sv-anim .day-card{animation:dcIn .4s cubic-bezier(.22,1,.36,1) backwards;}
+@keyframes dcIn{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:translateX(0);}}
+.live-dot{box-shadow:0 0 0 0 rgba(48,209,88,.55);animation:liveDot 1.9s ease-in-out infinite;}
+@keyframes liveDot{0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,.55);}50%{box-shadow:0 0 0 8px rgba(48,209,88,0);}}
+#statsView .widget-card.card{transition:transform .2s ease,box-shadow .25s ease;}
+.tdy-badge{animation:badgePulse 2.6s ease-in-out infinite;}
+@keyframes badgePulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.04);opacity:.9;}}
+.fi-tips .ti-hd{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;font-weight:800;margin-bottom:8px;}
+.fi-tip{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;margin-bottom:5px;background:rgba(255,255,255,.025);
+  border-left:2px solid var(--blue);border-radius:8px;font-size:12.5px;color:var(--text-2);line-height:1.45;}
+.fi-tip .num{flex:none;width:18px;height:18px;border-radius:50%;background:rgba(10,132,255,.25);color:#9bc8ff;
+  display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;}
+.fi-tip:nth-child(3){border-left-color:#30d158;}
+.fi-tip:nth-child(3) .num{background:rgba(48,209,88,.25);color:#5ee577;}
+.fi-tip:nth-child(4){border-left-color:#ff9f0a;}
+.fi-tip:nth-child(4) .num{background:rgba(255,159,10,.25);color:#ffb340;}
+.fi-tip:nth-child(5){border-left-color:#bf5af2;}
+.fi-tip:nth-child(5) .num{background:rgba(191,90,242,.25);color:#d9a3ff;}
+.fi-tip:nth-child(6){border-left-color:#ff453a;}
+.fi-tip:nth-child(6) .num{background:rgba(255,69,58,.25);color:#ff8a82;}
+.fi-tip:nth-child(7){border-left-color:#64d2ff;}
+.fi-tip:nth-child(7) .num{background:rgba(100,210,255,.25);color:#9be0ff;}
+.fa-hd{display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px;}
+.fa-hd .fa-ttl{font-size:11px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;}
+.fa-tog{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:var(--text-2);
+  font-size:11px;font-weight:700;padding:5px 11px;border-radius:11px;cursor:pointer;font-family:inherit;letter-spacing:.3px;display:flex;align-items:center;gap:5px;}
+.fa-tog:active{transform:scale(.95);}
+.fa-tog svg{width:11px;height:11px;transition:transform .25s ease;}
+.fa-tog.open svg{transform:rotate(180deg);}
+.fa-pager{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:8px;}
+.fa-pager button{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:var(--text-2);
+  width:28px;height:28px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.fa-pager button:disabled{opacity:.3;}
+.fa-pager button:active:not(:disabled){transform:scale(.92);}
+.fa-pager button svg{width:13px;height:13px;}
+.fa-pager .fa-info{font-size:11px;color:var(--text-2);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px;}
+.focus-row{display:flex;gap:10px;margin:8px 0 10px;}
+.focus-tile{flex:1;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:4px;}
+.focus-tile .ft-l{font-size:10.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;}
+.focus-tile .ft-v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px;}
+.focus-tile.green .ft-v{background:linear-gradient(180deg,#5ee577,#1fb84a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.focus-tile.amber .ft-v{background:linear-gradient(180deg,#ffb340,#d6852a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.focus-tile.red .ft-v{background:linear-gradient(180deg,#ff6b60,#d6352b);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.focus-tile.blue .ft-v{background:linear-gradient(180deg,#7ab8ff,#0a72e8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.focus-tile .ft-s{font-size:11px;color:var(--text-2);font-weight:600;}
+.fc-tabs{display:flex;gap:5px;margin:10px 0 8px;}
+.fc-tabs button{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
+  color:var(--text-2);font-size:11px;font-weight:700;padding:7px;border-radius:10px;cursor:pointer;
+  font-family:inherit;letter-spacing:.4px;text-transform:uppercase;transition:.15s;}
+.fc-tabs button.on{background:linear-gradient(180deg,#3a98ff,#0a72e8);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(10,132,255,.3);}
+.fc-tabs button:active{transform:scale(.96);}
+.focus-chart{display:flex;align-items:flex-end;gap:6px;height:110px;padding:8px 4px;
+  border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.02);margin-bottom:10px;}
+.fc-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;}
+.fc-bar{width:100%;max-width:30px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#3a98ff,#0a72e8);transition:height .5s ease;min-height:2px;}
+.fc-bar.green{background:linear-gradient(180deg,#3ddf6b,#1fb84a);}
+.fc-bar.amber{background:linear-gradient(180deg,#ffb340,#d6852a);}
+.fc-bar.red{background:linear-gradient(180deg,#ff6b60,#d6352b);}
+.fc-bar.empty{background:rgba(255,255,255,.06);}
+.fc-lbl{font-size:9.5px;color:var(--text-3);font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
+.fc-val{font-size:9.5px;color:var(--text-2);font-weight:700;font-variant-numeric:tabular-nums;}
+.fa-collapse{overflow:hidden;max-height:0;opacity:0;
+  transition:max-height .45s cubic-bezier(.22,1,.36,1),opacity .3s ease,margin .35s ease;
+  margin-top:0;}
+.fa-collapse.open{max-height:1500px;opacity:1;margin-top:6px;}
+.fa-list{display:flex;flex-direction:column;gap:6px;}
+.fa-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.06);border-radius:11px;}
+.fa-row .fa-tm{font-size:11px;color:var(--text-3);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px;}
+.fa-row .fa-mid{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;}
+.fa-row .fa-mid .t1{font-size:13px;font-weight:700;color:var(--text);}
+.fa-row .fa-mid .t2{font-size:10.5px;color:var(--text-2);font-weight:600;letter-spacing:.2px;}
+.fa-empty{text-align:center;padding:18px;color:var(--text-3);font-size:13px;}
+.sheet-focus{display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap;}
+.sheet-focus .sf-pill{flex:1;min-width:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:8px 10px;}
+.sheet-focus .sf-pill .l{font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;}
+.sheet-focus .sf-pill .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.3px;color:var(--text);}
+`;
+document.head.appendChild(focusCSS);
+
+function fsColor(s){return s>=70?'green':(s>=40?'amber':'red');}
+function sessionsForDate(k){return (hist||[]).filter(r=>r.date===k);}
+function dayFocus(k){
+  const rs=sessionsForDate(k);if(!rs.length)return null;
+  let totMin=0,wScore=0;
+  rs.forEach(r=>{const m=Math.max(1,r.focusedMin||0);totMin+=m;wScore+=m*(r.focusScore||0);});
+  if(!totMin)return null;
+  return Math.round(wScore/totMin);
+}
+function dayDistract(k){return sessionsForDate(k).reduce((s,r)=>s+(r.distractions||0),0);}
+function weekFocus(){
+  const today=new Date();today.setHours(0,0,0,0);
+  let totMin=0,wScore=0;
+  for(let i=0;i<7;i++){
+    const d=new Date(today);d.setDate(today.getDate()-i);
+    const k=keyOf(d);
+    sessionsForDate(k).forEach(r=>{const m=Math.max(1,r.focusedMin||0);totMin+=m;wScore+=m*(r.focusScore||0);});
+  }
+  return totMin?Math.round(wScore/totMin):null;
+}
+
+function buildFocusCard(){
+  const sv=document.getElementById('statsView');if(!sv)return;
+  let card=document.getElementById('focusAnalysis');
+  if(!card){
+    card=document.createElement('div');card.id='focusAnalysis';
+    card.className='widget-card card focus-card';
+    sv.insertBefore(card, sv.querySelector('.history-card')||sv.children[1]||null);
+  }
+  const today=keyOf(new Date());
+  const dFs=dayFocus(today);
+  const wFs=weekFocus();
+  const dDis=dayDistract(today);
+  const todaySess=sessionsForDate(today);
+  const todayMin=todaySess.reduce((s,r)=>s+(r.focusedMin||0),0);
+  let html='<div class="c-head"><div class="c-title">'+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>'+
+    'Focus Analysis</div></div>';
+  html+='<div class="focus-row">'+
+    '<div class="focus-tile '+(dFs==null?'blue':fsColor(dFs))+'"><span class="ft-l">Today</span><span class="ft-v">'+(dFs==null?'—':dFs)+'</span><span class="ft-s">'+todaySess.length+' session'+(todaySess.length===1?'':'s')+' · '+fmtDur(Math.round(todayMin))+'</span></div>'+
+    '<div class="focus-tile '+(wFs==null?'blue':fsColor(wFs))+'"><span class="ft-l">Week</span><span class="ft-v">'+(wFs==null?'—':wFs)+'</span><span class="ft-s">7-day weighted avg</span></div>'+
+    '<div class="focus-tile '+(dDis?'red':'blue')+'"><span class="ft-l">Distract</span><span class="ft-v">'+dDis+'</span><span class="ft-s">today</span></div>'+
+    '</div>';
+  html+='<div class="fc-tabs" id="fcTabs">'+
+    '<button data-p="7d" class="'+(_fcPeriod==='7d'?'on':'')+'">7 Days</button>'+
+    '<button data-p="4w" class="'+(_fcPeriod==='4w'?'on':'')+'">4 Weeks</button>'+
+    '<button data-p="12w" class="'+(_fcPeriod==='12w'?'on':'')+'">12 Weeks</button>'+
+    '</div>';
+  html+='<div class="focus-chart" id="fcChart"></div>';
+  card.innerHTML=html;
+  document.querySelectorAll('#fcTabs button').forEach(b=>{
+    b.onclick=()=>{_fcPeriod=b.dataset.p;buildFocusCard();};
+  });
+  populateFcChart();
+  renderFaSessions(todaySess);
+  buildFocusInfoCard();
+}
+
+const FA_PER_PAGE=5;
+let _faOpen=false, _faPage=0, _fcPeriod='7d';
+
+function rangeFocus(startDate,endDate){
+  let totMin=0,wScore=0;
+  for(let d=new Date(startDate);d<=endDate;d.setDate(d.getDate()+1)){
+    sessionsForDate(keyOf(d)).forEach(r=>{const m=Math.max(1,r.focusedMin||0);totMin+=m;wScore+=m*(r.focusScore||0);});
+  }
+  return totMin?Math.round(wScore/totMin):null;
+}
+
+function populateFcChart(){
+  const fc=document.getElementById('fcChart');if(!fc)return;
+  fc.innerHTML='';
+  const today0=new Date();today0.setHours(0,0,0,0);
+  const bars=[];
+  if(_fcPeriod==='7d'){
+    for(let i=6;i>=0;i--){
+      const d=new Date(today0);d.setDate(today0.getDate()-i);
+      bars.push({fs:dayFocus(keyOf(d)),lbl:['S','M','T','W','T','F','S'][d.getDay()]});
+    }
+  } else {
+    const weeks=_fcPeriod==='4w'?4:12;
+    for(let i=weeks-1;i>=0;i--){
+      const end=new Date(today0);end.setDate(today0.getDate()-i*7);
+      const start=new Date(end);start.setDate(end.getDate()-6);
+      const fs=rangeFocus(start,end);
+      const lbl=i===0?'NOW':('-'+i+'w');
+      bars.push({fs,lbl});
+    }
+  }
+  bars.forEach((b,i)=>{
+    const col=document.createElement('div');col.className='fc-col';
+    const bar=document.createElement('div');bar.className='fc-bar '+(b.fs==null?'empty':fsColor(b.fs));
+    bar.style.height='0%';
+    const val=document.createElement('div');val.className='fc-val';val.textContent=b.fs==null?'—':b.fs;
+    const lblEl=document.createElement('div');lblEl.className='fc-lbl';lblEl.textContent=b.lbl;
+    col.appendChild(bar);col.appendChild(val);col.appendChild(lblEl);
+    fc.appendChild(col);
+    const target=b.fs==null?2:Math.max(4,b.fs);
+    setTimeout(()=>{bar.style.height=target+'%';}, 60+i*40);
+  });
+}
+
+let _fiOpen=false;
+function buildFocusInfoCard(){
+  const sv=document.getElementById('statsView');if(!sv)return;
+  let card=document.getElementById('focusInfo');
+  if(!card){
+    card=document.createElement('div');card.id='focusInfo';
+    card.className='widget-card card focus-info';
+    sv.appendChild(card); // always last child
+  } else if(card!==sv.lastElementChild){
+    sv.appendChild(card);
+  }
+  card.innerHTML=
+    '<button class="c-head fi-toggle" id="fiToggle" style="display:flex;width:100%;background:transparent;border:none;padding:0;cursor:pointer;color:inherit;font-family:inherit;">'+
+      '<div class="c-title" style="flex:1;text-align:left;">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'+
+        'How Focus Score works</div>'+
+      '<svg class="fi-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;transition:transform .3s ease;'+(_fiOpen?'transform:rotate(180deg);':'')+'"><path d="M6 9l6 6 6-6"/></svg>'+
+    '</button>'+
+    '<div id="fiBody" style="overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:'+(_fiOpen?'2000px':'0')+';opacity:'+(_fiOpen?'1':'0')+';">'+
+    '<div style="font-size:13px;color:var(--text-2);line-height:1.55;margin:10px 0 8px;">'+
+      'A blend of <b style="color:var(--text)">what you finished</b> and <b style="color:var(--text)">how steadily you stayed in</b>. 0 to 100 per session.</div>'+
+    '<div class="fi-formula">'+
+      '<b>core</b> = goalsDone/total × 0.7 &nbsp;+&nbsp; elapsed/plan × 0.3<br>'+
+      '<b>score</b> = core × (1 − distractPen − latePen) × 100<br>'+
+      '<span style="color:var(--text-3)">distractPen = min(0.40, count × 0.05)</span><br>'+
+      '<span style="color:var(--text-3)">latePen = min(0.30, overdueGoals × 0.08)</span>'+
+    '</div>'+
+    '<div class="fi-rows">'+
+      '<div class="fi-row"><div class="fi-ic g">✓</div><div class="fi-mid"><b>Finishing goals</b> drives 70% of your score. Done = +, undone = 0.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic b">⏱</div><div class="fi-mid"><b>Time on task</b> adds the other 30% — partial credit while a goal is still in progress.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic r">⚠</div><div class="fi-mid"><b>Each distraction</b> tap = −5% (caps at −40%). Every goal past its slot = −8% (caps at −30%).</div></div>'+
+      '<div class="fi-row"><div class="fi-ic a">★</div><div class="fi-mid"><b>Day &amp; Week</b> = focused-minute weighted average of session scores. Longer sessions weigh more.</div></div>'+
+    '</div>'+
+    '</div>';
+  document.getElementById('fiToggle').onclick=()=>{
+    _fiOpen=!_fiOpen;
+    const body=document.getElementById('fiBody');
+    const chev=card.querySelector('.fi-chev');
+    if(_fiOpen){body.style.maxHeight='2000px';body.style.opacity='1';chev.style.transform='rotate(180deg)';}
+    else{body.style.maxHeight='0';body.style.opacity='0';chev.style.transform='rotate(0deg)';}
+  };
+}
+function renderFaSessions(todaySess){
+  const card=document.getElementById('focusAnalysis');if(!card)return;
+  // header
+  let hd=document.getElementById('faHd');
+  if(!hd){
+    hd=document.createElement('div');hd.id='faHd';hd.className='fa-hd';
+    hd.innerHTML='<span class="fa-ttl">Today\'s sessions</span>'+
+      '<button class="fa-tog" id="faTog"><span id="faTogLbl">Show</span>'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
+    card.appendChild(hd);
+    document.getElementById('faTog').onclick=()=>{
+      _faOpen=!_faOpen;
+      const w=document.getElementById('faWrap');
+      const t=document.getElementById('faTog');
+      const lbl=document.getElementById('faTogLbl');
+      if(w)w.classList.toggle('open',_faOpen);
+      if(t)t.classList.toggle('open',_faOpen);
+      if(lbl)lbl.textContent=_faOpen?'Hide':('Show ('+(sessionsForDate(keyOf(new Date())).length)+')');
+    };
+  }
+  const tog=document.getElementById('faTog');
+  const togLbl=document.getElementById('faTogLbl');
+  tog.classList.toggle('open',_faOpen);
+  togLbl.textContent=_faOpen?'Hide':('Show ('+todaySess.length+')');
+  // collapsible wrapper for list + pager
+  let wrap=document.getElementById('faWrap');
+  if(!wrap){
+    wrap=document.createElement('div');wrap.id='faWrap';wrap.className='fa-collapse';
+    const fl=document.createElement('div');fl.id='faList';fl.className='fa-list';
+    const pg=document.createElement('div');pg.id='faPager';pg.className='fa-pager';
+    wrap.appendChild(fl);wrap.appendChild(pg);
+    card.appendChild(wrap);
+  }
+  const fl=document.getElementById('faList');
+  const pg=document.getElementById('faPager');
+  wrap.classList.toggle('open',_faOpen && !!todaySess.length);
+  if(!todaySess.length){
+    fl.innerHTML='<div class="fa-empty">No sessions yet today</div>';
+    pg.innerHTML='';
+    return;
+  }
+  const sorted=todaySess.slice().sort((a,b)=>b.startMs-a.startMs);
+  const pages=Math.max(1,Math.ceil(sorted.length/FA_PER_PAGE));
+  if(_faPage>=pages)_faPage=pages-1;
+  if(_faPage<0)_faPage=0;
+  const slice=sorted.slice(_faPage*FA_PER_PAGE,(_faPage+1)*FA_PER_PAGE);
+  fl.innerHTML='';
+  slice.forEach(r=>{
+    const row=document.createElement('div');row.className='fa-row';
+    const cls=fsColor(r.focusScore||0);
+    const t1=fmtClock(new Date(r.startMs))+' → '+fmtClock(new Date(r.endMs));
+    const t2=fmtDur(r.focusedMin||0)+' · '+r.goalsDone+'/'+r.goalsTotal+' goals · '+(r.distractions||0)+' distract'+(r.stoppedEarly?' · stopped early':'');
+    row.innerHTML='<div class="fa-tm">'+t1+'</div><div class="fa-mid"><div class="t1">'+(r.goalsDone===r.goalsTotal?'Completed':'Partial')+'</div><div class="t2">'+t2+'</div></div>'+
+      '<span class="focus-pill '+(cls==='green'?'':(cls==='amber'?'med':'low'))+'">'+(r.focusScore||0)+'</span>';
+    fl.appendChild(row);
+  });
+  if(pages>1){
+    pg.innerHTML='<button id="faPrev" '+(_faPage===0?'disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>'+
+      '<span class="fa-info">'+(_faPage+1)+' / '+pages+'</span>'+
+      '<button id="faNext" '+(_faPage>=pages-1?'disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>';
+    document.getElementById('faPrev').onclick=()=>{if(_faPage>0){_faPage--;buildFocusCard();}};
+    document.getElementById('faNext').onclick=()=>{if(_faPage<pages-1){_faPage++;buildFocusCard();}};
+  } else { pg.innerHTML=''; }
+}
+
+// hook into prepareView for stats
+const _origPrepareView=window.prepareView||null;
+if(typeof prepareView==='function'){
+  const _orig=prepareView;
+  window.prepareView=function(v){
+    _orig(v);
+    if(v==='stats')buildFocusCard();
+  };
+  // also hook via override of switchView's prep call: prepareView is used internally — easiest: poll on view change
+}
+// fallback: also rebuild when tab clicked + reset stats anim
+function _retriggerStatsAnim(){
+  const sv=document.getElementById('statsView');if(!sv)return;
+  sv.classList.remove('sv-anim');void sv.offsetWidth;sv.classList.add('sv-anim');
+  setTimeout(()=>sv.classList.remove('sv-anim'),1600);
+}
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    if(t.dataset.view==='stats'){setTimeout(()=>{buildFocusCard();_retriggerStatsAnim();},30);}
+  });
+});
+
+// augment openDay sheet with focus/sessions for that date
+if(typeof window.openDay==='function'){
+  const _origOpenDay=window.openDay;
+  window.openDay=function(key){
+    _origOpenDay(key);
+    setTimeout(()=>{
+      const sheet=document.getElementById('sheet');if(!sheet)return;
+      let fb=document.getElementById('shFocusBlock');
+      if(!fb){
+        fb=document.createElement('div');fb.id='shFocusBlock';
+        const goalsHd=sheet.querySelector('#shGoalList');
+        if(goalsHd&&goalsHd.parentNode)goalsHd.parentNode.insertBefore(fb,goalsHd);
+        else sheet.appendChild(fb);
+      }
+      const rs=sessionsForDate(key);
+      const fs=dayFocus(key);
+      const dis=dayDistract(key);
+      const totMin=rs.reduce((s,r)=>s+(r.focusedMin||0),0);
+      let html='<div class="sheet-focus">'+
+        '<div class="sf-pill"><div class="l">Focus</div><div class="v">'+(fs==null?'—':fs)+'</div></div>'+
+        '<div class="sf-pill"><div class="l">Sessions</div><div class="v">'+rs.length+'</div></div>'+
+        '<div class="sf-pill"><div class="l">Focused</div><div class="v">'+fmtDur(Math.round(totMin))+'</div></div>'+
+        '<div class="sf-pill"><div class="l">Distract</div><div class="v">'+dis+'</div></div>'+
+        '</div>';
+      if(rs.length){
+        html+='<div class="fa-list" style="margin-bottom:14px">';
+        rs.slice().sort((a,b)=>a.startMs-b.startMs).forEach(r=>{
+          const cls=fsColor(r.focusScore||0);
+          html+='<div class="fa-row">'+
+            '<div class="fa-tm">'+fmtClock(new Date(r.startMs))+'</div>'+
+            '<div class="fa-mid"><div class="t1">'+(r.goalsDone===r.goalsTotal?'Completed':'Partial')+'</div>'+
+            '<div class="t2">'+fmtDur(r.focusedMin||0)+' · '+r.goalsDone+'/'+r.goalsTotal+' goals · '+r.distractions+'×</div></div>'+
+            '<span class="focus-pill '+(cls==='green'?'':(cls==='amber'?'med':'low'))+'">'+(r.focusScore||0)+'</span></div>';
+        });
+        html+='</div>';
+      }
+      fb.innerHTML=html;
+    },10);
+  };
+}
+
+})();
 </script>
 </body>
 </html>
