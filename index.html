@@ -1770,7 +1770,7 @@ function _refreshAutoChips(){
     const eta=chip.querySelector('.hc-eta');
     if(eta){
       const remMin=Math.ceil(Math.max(0,need-acc)/60000);
-      eta.textContent=(state.running?remMin+'m left':remMin+'m to go');
+      eta.textContent=(state.running?_fmtDur(remMin)+' left':_fmtDur(remMin)+' to go');
     }
   });
 }
@@ -2001,6 +2001,7 @@ async function saveHabitAuto(){await kvPut('habitAuto',habitAuto);}
 /* ----- time window helpers ----- */
 function _parseHM(s){if(!s||!/^\d{2}:\d{2}$/.test(s))return null;const[h,m]=s.split(':').map(Number);return h*60+m;}
 function _fmt12(hm){if(!hm)return '';const[h,m]=hm.split(':').map(Number);const ap=h>=12?'PM':'AM';let hh=h%12;if(hh===0)hh=12;return hh+':'+String(m).padStart(2,'0')+' '+ap;}
+function _fmtDur(min){min=Math.max(0,Math.round(min));if(min<60)return min+'m';const h=Math.floor(min/60),m=min%60;return m?h+'h '+m+'m':h+'h';}
 function _fmtRange(s,e){if(s&&e)return _fmt12(s)+' – '+_fmt12(e);if(s)return 'from '+_fmt12(s);if(e)return 'until '+_fmt12(e);return '';}
 function _nowMin(){const d=new Date();return d.getHours()*60+d.getMinutes();}
 function habitWindowState(h){
@@ -2047,7 +2048,7 @@ function _heFmtNote(h){
   if(h.mode==='auto'){
     const w=_fmtRange(h.startTime,h.endTime)||'any time';
     const mm=h.minMinutes||0;
-    return 'Auto-checks when timer runs ≥ '+mm+' min between '+w;
+    return 'Auto-checks when timer runs ≥ '+_fmtDur(mm)+' between '+w;
   }
   if(!h.startTime&&!h.endTime)return 'Check manually anytime today';
   if(h.startTime&&h.endTime)return 'Check between '+_fmt12(h.startTime)+' and '+_fmt12(h.endTime);
@@ -2077,7 +2078,7 @@ function _heUpdate(){
   const h=habitById(_heId);const color=h?h.color:'#0a84ff';
   const pv=document.getElementById('hePreview');
   const win=(draft.startTime&&draft.endTime)?_fmt12(draft.startTime)+' – '+_fmt12(draft.endTime):(draft.startTime?'≥ '+_fmt12(draft.startTime):(draft.endTime?'≤ '+_fmt12(draft.endTime):''));
-  const tag=m==='auto'?(draft.minMinutes?draft.minMinutes+'m':'AUTO'):'MANUAL';
+  const tag=m==='auto'?(draft.minMinutes?_fmtDur(draft.minMinutes):'AUTO'):'MANUAL';
   pv.className='he-preview '+m;
   pv.innerHTML='<div class="pv-chip"><span class="pv-dot" style="border-color:'+color+';background:'+color+'33"></span>'+escapeHtml(name)+(win?'<span class="pv-meta">'+win+'</span>':'')+'<span class="pv-meta">'+tag+'</span></div>';
 }
@@ -2177,7 +2178,7 @@ function renderHabitManage(){
     const badges=
       '<span class="hm-badge '+(isAuto?'auto':'manual')+'">'+modeIcon+(isAuto?'Auto':'Manual')+'</span>'+
       (winTxt?'<span class="hm-badge win">'+winIcon+winTxt+'</span>':'')+
-      (isAuto&&h.minMinutes?'<span class="hm-badge min">'+minIcon+h.minMinutes+' min</span>':'');
+      (isAuto&&h.minMinutes?'<span class="hm-badge min">'+minIcon+_fmtDur(h.minMinutes)+'</span>':'');
     row.innerHTML=
       '<span class="hm-grip" aria-label="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01"/></svg></span>'+
       '<span class="hm-color"></span>'+
@@ -2228,7 +2229,7 @@ function renderTodayChips(animateId){
     else if(before)statusSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
     const timeTxt=(h.startTime&&h.endTime)?_fmt12(h.startTime)+'–'+_fmt12(h.endTime):(h.startTime?'≥'+_fmt12(h.startTime):(h.endTime?'≤'+_fmt12(h.endTime):''));
     const timeHtml=(timeTxt&&!on&&!pending)?'<span class="hc-time">'+timeTxt+'</span>':'';
-    const minHtml=(isAuto&&!on&&!pending&&h.minMinutes)?'<span class="hc-min">'+h.minMinutes+'m</span>':'';
+    const minHtml=(isAuto&&!on&&!pending&&h.minMinutes)?'<span class="hc-min">'+_fmtDur(h.minMinutes)+'</span>':'';
     let etaHtml='';
     if(pending){
       const acc=(habitAuto[k]&&habitAuto[k][h.id])||0;
@@ -2237,7 +2238,7 @@ function renderTodayChips(animateId){
       const prog=need>0?Math.min(1,acc/need):0;
       chip.style.setProperty('--prog',prog.toFixed(3));
       const remMin=Math.ceil(rem/60000);
-      const txt=state.running?(remMin+'m left'):(remMin+'m to go');
+      const txt=state.running?(_fmtDur(remMin)+' left'):(_fmtDur(remMin)+' to go');
       etaHtml='<span class="hc-eta">'+txt+'</span>';
     }
     const statusHtml=statusSvg?'<span class="hc-status">'+statusSvg+'</span>':'';
