@@ -4051,10 +4051,10 @@ function populateFcChart(){
       bars.push({pts:rangePoints(start,end),min:rangeFocusedMin(start,end),lbl:i===0?'NOW':('-'+i+'w')});
     }
   }
-  // dynamic scaling — find max absolute pts
+  // scale: tallest bar = 100%, others proportional to it
   let maxAbs=0;
   bars.forEach(b=>{if(b.pts!=null)maxAbs=Math.max(maxAbs,Math.abs(b.pts));});
-  if(maxAbs<10)maxAbs=10;
+  if(maxAbs<1)maxAbs=1;
   bars.forEach((b,i)=>{
     const col=document.createElement('div');col.className='fc-col';
     const bar=document.createElement('div');
@@ -4066,7 +4066,7 @@ function populateFcChart(){
     const lblEl=document.createElement('div');lblEl.className='fc-lbl';lblEl.textContent=b.lbl;
     col.appendChild(bar);col.appendChild(val);col.appendChild(lblEl);
     fc.appendChild(col);
-    const pct=b.pts==null?2:Math.max(4,Math.min(100,Math.abs(b.pts)/maxAbs*100));
+    const pct=b.pts==null?2:Math.max(3,Math.abs(b.pts)/maxAbs*100);
     setTimeout(()=>{bar.style.height=pct+'%';}, 60+i*40);
   });
 }
