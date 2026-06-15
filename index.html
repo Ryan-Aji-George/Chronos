@@ -3915,8 +3915,9 @@ focusCSS.textContent=`
 .fc-tabs button:active{transform:scale(.96);}
 .focus-chart{display:flex;align-items:flex-end;gap:6px;height:110px;padding:8px 4px;
   border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.02);margin-bottom:10px;}
-.fc-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;}
-.fc-bar{width:100%;max-width:30px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#3a98ff,#0a72e8);transition:height .5s ease;min-height:2px;}
+.fc-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0;height:100%;}
+.fc-bar-wrap{flex:1;width:100%;max-width:30px;display:flex;align-items:flex-end;justify-content:center;}
+.fc-bar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#3a98ff,#0a72e8);transition:height .6s cubic-bezier(.22,1,.36,1);min-height:2px;}
 .fc-bar.green{background:linear-gradient(180deg,#3ddf6b,#1fb84a);}
 .fc-bar.amber{background:linear-gradient(180deg,#ffb340,#d6852a);}
 .fc-bar.red{background:linear-gradient(180deg,#ff6b60,#d6352b);}
@@ -4057,16 +4058,18 @@ function populateFcChart(){
   if(maxAbs<1)maxAbs=1;
   bars.forEach((b,i)=>{
     const col=document.createElement('div');col.className='fc-col';
+    const wrap=document.createElement('div');wrap.className='fc-bar-wrap';
     const bar=document.createElement('div');
     const color=b.pts==null?'empty':ptsColor(b.pts,b.min);
     bar.className='fc-bar '+color;
     bar.style.height='0%';
+    wrap.appendChild(bar);
     const val=document.createElement('div');val.className='fc-val';
     val.textContent=b.pts==null?'—':((b.pts>=0?'+':'')+b.pts);
     const lblEl=document.createElement('div');lblEl.className='fc-lbl';lblEl.textContent=b.lbl;
-    col.appendChild(bar);col.appendChild(val);col.appendChild(lblEl);
+    col.appendChild(wrap);col.appendChild(val);col.appendChild(lblEl);
     fc.appendChild(col);
-    const pct=b.pts==null?2:Math.max(3,Math.abs(b.pts)/maxAbs*100);
+    const pct=b.pts==null?3:Math.max(4,Math.abs(b.pts)/maxAbs*100);
     setTimeout(()=>{bar.style.height=pct+'%';}, 60+i*40);
   });
 }
