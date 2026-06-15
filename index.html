@@ -3302,6 +3302,35 @@ function ptsColorRel(pts,maxAbs){
   if(r>=0.33)return 'amber';
   return 'red';
 }
+/* rank-based bucket: top third green, mid amber, bottom red.
+   Works even when one outlier dwarfs others. */
+function _rankBucket(values){
+  const sorted=(values||[]).filter(v=>v!=null&&v>0).slice().sort((a,b)=>b-a);
+  if(!sorted.length)return ()=>'red';
+  const n=sorted.length;
+  const gMin=sorted[Math.max(0,Math.ceil(n/3)-1)];
+  const aMin=sorted[Math.max(0,Math.ceil(2*n/3)-1)];
+  return v=>{
+    if(v==null)return 'empty';
+    if(v<0)return 'red';
+    if(v>=gMin)return 'green';
+    if(v>=aMin)return 'amber';
+    return 'red';
+  };
+}
+function _allDayPts(){return _allDayKeys().map(k=>dayPoints(k)).filter(v=>v!=null);}
+function _allSessionPts(){return (hist||[]).map(r=>r.points!=null?r.points:(r.focusScore||0));}
+function _allWeekPts(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const out=[];
+  for(let i=0;i<12;i++){
+    const end=new Date(today);end.setDate(today.getDate()-i*7);
+    const start=new Date(end);start.setDate(end.getDate()-6);
+    const p=rangePoints(start,end);
+    if(p!=null)out.push(p);
+  }
+  return out;
+}
 /* Habit points: done² / total × 5  → rewards completion ratio, not count
    10/10 = 50, 20/100 = 20, 5/5 = 25, 0/10 = 0 */
 function habitPointsFor(k){
@@ -3413,7 +3442,8 @@ function renderMeta(){
   if(dist) html+='<span class="sm-dot">·</span><span style="color:#ff8a82">⚠ '+dist+' distract'+(dist===1?'':'s')+' (−'+(dist*2)+')</span>';
   if(pausedMin>0) html+='<span class="sm-dot">·</span><span style="color:#ffb340">⏸ '+fmtDur(pausedMin)+' paused (−'+pausedMin+')</span>';
   if(pts!=null){
-    const c=ptsColorRel(pts,bestSessionPts());
+    const all=_allSessionPts();all.push(pts);
+    const c=pts<0?'red':_rankBucket(all)(pts);
     const cls=c==='green'?'':(c==='amber'?' med':' low');
     const sign=pts>=0?'+':'';
     html+='<span class="focus-pill'+cls+'">'+sign+pts+' MOMENTUM</span>';
@@ -4011,9 +4041,10 @@ function buildFocusCard(){
   let html='<div class="c-head"><div class="c-title">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'+
     'Momentum</div></div>';
-  const bestD=bestDayPts();
-  const dCol=ptsColorRel(dP,bestD);
-  const wCol=ptsColorRel(wP,bestD*7);
+  const dayBucket=_rankBucket(_allDayPts());
+  const wkBucket=_rankBucket(_allWeekPts());
+  const dCol=dP==null?'blue':(dP<0?'red':dayBucket(dP));
+  const wCol=wP==null?'blue':(wP<0?'red':wkBucket(wP));
   html+='<div class="focus-row">'+
     '<div class="focus-tile '+dCol+'"><span class="ft-l">Today</span><span class="ft-v">'+(dP==null?'—':((dP>=0?'+':'')+dP))+'</span><span class="ft-s">'+todaySess.length+' sess · '+fmtDur(Math.round(todayMin))+' · '+dHab+'/'+hTotal+' habits</span></div>'+
     '<div class="focus-tile '+wCol+'"><span class="ft-l">Week</span><span class="ft-v">'+(wP==null?'—':((wP>=0?'+':'')+wP))+'</span><span class="ft-s">7-day total</span></div>'+
@@ -4074,11 +4105,12 @@ function populateFcChart(){
   let maxAbs=0;
   bars.forEach(b=>{if(b.pts!=null)maxAbs=Math.max(maxAbs,Math.abs(b.pts));});
   if(maxAbs<1)maxAbs=1;
+  const periodBucket=_rankBucket(bars.map(b=>b.pts));
   bars.forEach((b,i)=>{
     const col=document.createElement('div');col.className='fc-col';
     const wrap=document.createElement('div');wrap.className='fc-bar-wrap';
     const bar=document.createElement('div');
-    const color=b.pts==null?'empty':ptsColorRel(b.pts,maxAbs);
+    const color=b.pts==null?'empty':(b.pts<0?'red':periodBucket(b.pts));
     bar.className='fc-bar '+color;
     bar.style.height='0%';
     wrap.appendChild(bar);
@@ -4202,10 +4234,11 @@ function renderFaSessions(todaySess){
   if(_faPage<0)_faPage=0;
   const slice=sorted.slice(_faPage*FA_PER_PAGE,(_faPage+1)*FA_PER_PAGE);
   fl.innerHTML='';
+  const sessBucket=_rankBucket(_allSessionPts());
   slice.forEach(r=>{
     const row=document.createElement('div');row.className='fa-row';
     const pts=r.points!=null?r.points:(r.focusScore||0);
-    const cls=ptsColorRel(pts,bestSessionPts());
+    const cls=pts<0?'red':sessBucket(pts);
     const t1=fmtClock(new Date(r.startMs))+' → '+fmtClock(new Date(r.endMs));
     const bits=[fmtDur(r.focusedMin||0),r.goalsDone+'/'+r.goalsTotal+' goals'];
     if(r.distractions)bits.push('⚠'+r.distractions);
@@ -4275,9 +4308,10 @@ if(typeof window.openDay==='function'){
         '</div>';
       if(rs.length){
         html+='<div class="fa-list" style="margin-bottom:14px">';
+        const sheetSessBucket=_rankBucket(_allSessionPts());
         rs.slice().sort((a,b)=>a.startMs-b.startMs).forEach(r=>{
           const pts=r.points!=null?r.points:(r.focusScore||0);
-          const cls=ptsColor(pts,r.focusedMin||0);
+          const cls=pts<0?'red':sheetSessBucket(pts);
           html+='<div class="fa-row">'+
             '<div class="fa-tm">'+fmtClock(new Date(r.startMs))+'</div>'+
             '<div class="fa-mid"><div class="t1">'+(r.goalsDone===r.goalsTotal?'Completed':'Partial')+'</div>'+
