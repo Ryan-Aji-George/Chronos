@@ -3223,28 +3223,84 @@ function scheduleGoals(){
     }
   }
 }
-function focusScore(){
+/* ===== Overall Points (per session) =====
+   +1 pt / focused minute
+   per goal: +planMin/2 base on completion; +(slot - doneMin) speed bonus if early;
+             -(doneMin - slot) * 1.5 penalty if late (also for incomplete)
+   extra goals (added after first batch all done) — positives DOUBLED, penalties single
+   distraction: -2 each (small, keep user truthful)
+   pause: -1 per paused minute
+   stopped early: -(remainingPlanMin) * 1
+*/
+function sessionPoints(){
   if(!sess||!sess.goals.length)return null;
-  const done=sess.goals.filter(g=>g.doneAt!=null).length;
-  const total=sess.goals.length;
-  const dist=(sess.distractions||[]).length;
-  const em=elapsedMin();
-  let overdue=0;
-  sess.goals.forEach(g=>{if(g.doneAt==null && g._end!=null && em>g._end)overdue++;});
-  // base = goal completion rate
-  const ratio=total>0?done/total:0;
-  // partial credit for time invested toward incomplete goals
-  const plan=totalPlanMin();
-  const timeRatio=plan>0?Math.min(1,em/plan):0;
-  // blend: 70% goals + 30% time
-  let core=ratio*0.7 + timeRatio*0.3;
-  // distraction penalty: each = -5%, cap 40%
-  const distPen=Math.min(0.4,dist*0.05);
-  // overdue penalty: each = -8%, cap 30%
-  const latePen=Math.min(0.3,overdue*0.08);
-  let s=core*(1-distPen-latePen)*100;
-  s=Math.round(s);if(s<0)s=0;if(s>100)s=100;
-  return s;
+  return _computePoints({
+    goals:sess.goals,
+    startMs:sess.startMs,
+    pausedMs:sess.pausedTotal||0,
+    distractions:(sess.distractions||[]).length,
+    focusedMin:elapsedMin(),
+    planMin:sess.planMin||0,
+    pausedMin:(sess.pausedTotal||0)/60000,
+    stoppedEarly:false,
+    live:true,
+  });
+}
+/* Per-session formula:
+   +1 / focused min (base time reward)
+   per goal (multiplier mul = 1, 2, 4, 8… per tier):
+     completed: +planMin*0.5*mul base
+                +(slot - doneMin)*mul if early (speed bonus, capped at slot)
+                -(doneMin - slot)*1.5 if late  (penalty NEVER multiplied)
+     undone   : -(focused - slot)*1.5 if past slot
+   -2 per distraction (small — keep user honest)
+   -1 per paused min
+   stopped early: -(plan - focused) pts
+*/
+function _computePoints(p){
+  let pts=0;
+  pts += (p.focusedMin||0) * 1;
+  (p.goals||[]).forEach(g=>{
+    const mul=g.mul||1;
+    const planMin=g.planMin||0;
+    const slot=g._end!=null?g._end:planMin;
+    if(g.doneAt!=null){
+      const doneMin=Math.max(0,(g.doneAt-p.startMs-(p.pausedMs||0))/60000);
+      pts += planMin*0.5*mul;
+      if(doneMin<=slot){
+        const speed=Math.min(slot,slot-doneMin);
+        pts += speed*mul;
+      } else {
+        pts -= (doneMin-slot)*1.5; // late: single penalty
+      }
+    } else {
+      const ref=p.focusedMin||0;
+      if(ref>slot) pts -= (ref-slot)*1.5;
+    }
+  });
+  pts -= (p.distractions||0)*2;
+  pts -= (p.pausedMin||0)*1;
+  if(p.stoppedEarly){
+    const remain=Math.max(0,(p.planMin||0)-(p.focusedMin||0));
+    pts -= remain*1;
+  }
+  return Math.round(pts);
+}
+function ptsColor(pts,focused){
+  if(focused<=0||pts==null)return 'blue';
+  const eff=pts/Math.max(1,focused);
+  if(eff>=1.5)return 'green';
+  if(eff>=0.7)return 'amber';
+  return 'red';
+}
+/* Habit points: done² / total × 5  → rewards completion ratio, not count
+   10/10 = 50, 20/100 = 20, 5/5 = 25, 0/10 = 0 */
+function habitPointsFor(k){
+  let total=0;
+  try{total=(typeof habits!=='undefined'?habits.length:0);}catch(e){}
+  const done=habitsDoneCount(k);
+  if(!total||!done)return 0;
+  return Math.round((done*done)/total*5);
 }
 
 async function persist(){try{await kvPut(SS_KEY,sess||null);}catch(e){}}
@@ -3252,35 +3308,75 @@ async function loadSess(){try{sess=(await kvGet(SS_KEY))||null;}catch(e){sess=nu
 async function loadHist(){try{hist=(await kvGet(HIST_KEY))||[];}catch(e){hist=[];}}
 async function saveHist(){try{await kvPut(HIST_KEY,hist);}catch(e){}}
 
+function _structSig(){
+  if(!sess)return '0';
+  return sess.goals.length+':'+sess.goals.map(g=>(g.doneAt!=null?'1':'0')+(g.mul||1)).join(',')+':'+(sess.extMin||0)+':'+(sess.stopPendingAt?1:0);
+}
+function _buildGoalRow(i){
+  const g=sess.goals[i];
+  const row=document.createElement('div');
+  row.className='sb-goal';
+  row.dataset.i=i;
+  const check=document.createElement('div');check.className='sbg-check';check.onclick=()=>toggleGoal(i);
+  const ord=document.createElement('div');ord.className='sbg-ord';ord.textContent=(i+1);
+  const mid=document.createElement('div');mid.className='sbg-mid';
+  const txt=document.createElement('div');txt.className='sbg-text';txt.textContent=g.text;
+  const tm=document.createElement('div');tm.className='sbg-time';
+  mid.appendChild(txt);mid.appendChild(tm);
+  const eta=document.createElement('div');eta.className='sbg-eta';
+  row.appendChild(check);row.appendChild(ord);row.appendChild(mid);row.appendChild(eta);
+  return row;
+}
 function renderBoard(){
   if(!sess){board.classList.remove('on');metaEl.classList.remove('on');dBtn.classList.remove('on');return;}
   scheduleGoals();
   board.classList.add('on');
   dBtn.classList.add('on');
   const endTs=sess.startMs+totalPlanMin()*60000;
-  $('sbHeadL').textContent=(sess.stopPendingAt?'Paused · ':'')+fmtDur(totalPlanMin())+' session';
-  $('sbHeadR').textContent='ends '+fmtClock(new Date(endTs));
+  const headL=(sess.stopPendingAt?'Paused · ':'')+fmtDur(totalPlanMin())+' session';
+  const headR='ends '+fmtClock(new Date(endTs));
+  if($('sbHeadL').textContent!==headL)$('sbHeadL').textContent=headL;
+  if($('sbHeadR').textContent!==headR)$('sbHeadR').textContent=headR;
   const list=$('sbList');
-  list.innerHTML='';
-  if(!sess.goals.length){
-    const e=document.createElement('div');e.className='sb-empty';e.textContent='No goals — stop session to start a new one.';list.appendChild(e);
-  } else {
+  const sig=_structSig();
+  if(list.dataset.sig!==sig){
+    list.innerHTML='';
+    list.dataset.sig=sig;
+    if(!sess.goals.length){
+      const e=document.createElement('div');e.className='sb-empty';e.textContent='No goals — stop session to start a new one.';list.appendChild(e);
+    } else {
+      sess.goals.forEach((_,i)=>list.appendChild(_buildGoalRow(i)));
+    }
+  }
+  if(sess.goals.length){
     const em=elapsedMin();
     const baseMs=sess.startMs;
     const curIdx=sess.goals.findIndex(x=>x.doneAt==null);
+    const rows=list.querySelectorAll('.sb-goal');
     sess.goals.forEach((g,i)=>{
+      const row=rows[i];if(!row)return;
       const isDone=g.doneAt!=null;
       const dl=g._end;
       const late=!isDone && dl!=null && em>dl;
       const urgent=!isDone && dl!=null && em>dl-3 && em<=dl;
       const isCur=i===curIdx && !sess.stopPendingAt;
-      const row=document.createElement('div');
-      row.className='sb-goal'+(isDone?' done':'')+(late?' late':'')+(urgent?' urgent':'')+(isCur?' current':'');
+      const cls='sb-goal'+(isDone?' done':'')+(late?' late':'')+(urgent?' urgent':'')+(isCur?' current':'');
+      if(row.className!==cls)row.className=cls;
       if(isCur){
         const span=Math.max(1,g.planMin||1);
         const prog=Math.max(0,Math.min(1,(em-(g._start||0))/span));
         row.style.setProperty('--prog',prog.toFixed(4));
+      } else if(row.style.getPropertyValue('--prog')){
+        row.style.removeProperty('--prog');
       }
+      const chk=row.querySelector('.sbg-check');
+      const chkCls='sbg-check'+(isDone?' on':'');
+      if(chk.className!==chkCls)chk.className=chkCls;
+      const startClock=fmtClock(new Date(baseMs+(g._start||0)*60000));
+      const endClock=fmtClock(new Date(baseMs+(g._end||0)*60000));
+      const tmTxt=startClock+' → '+endClock+' · '+fmtDur(g.planMin||0);
+      const tmEl=row.querySelector('.sbg-time');
+      if(tmEl.textContent!==tmTxt)tmEl.textContent=tmTxt;
       let etaTxt='';
       if(isDone){
         const dm=(g.doneAt-sess.startMs-(sess.pausedTotal||0))/60000;
@@ -3289,17 +3385,10 @@ function renderBoard(){
         const left=Math.round(dl-em);
         etaTxt=left>=0?(fmtDur(left)+' left'):('+'+fmtDur(-left)+' over');
       }
-      const startClock=fmtClock(new Date(baseMs+(g._start||0)*60000));
-      const endClock=fmtClock(new Date(baseMs+(g._end||0)*60000));
-      const check=document.createElement('div');check.className='sbg-check'+(isDone?' on':'');check.onclick=()=>toggleGoal(i);
-      const ord=document.createElement('div');ord.className='sbg-ord';ord.textContent=(i+1);
-      const mid=document.createElement('div');mid.className='sbg-mid';
-      const txt=document.createElement('div');txt.className='sbg-text';txt.textContent=g.text;
-      const tm=document.createElement('div');tm.className='sbg-time';tm.textContent=startClock+' → '+endClock+' · '+fmtDur(g.planMin||0);
-      mid.appendChild(txt);mid.appendChild(tm);
-      const eta=document.createElement('div');eta.className='sbg-eta';eta.textContent=etaTxt;
-      row.appendChild(check);row.appendChild(ord);row.appendChild(mid);row.appendChild(eta);
-      list.appendChild(row);
+      const etaEl=row.querySelector('.sbg-eta');
+      if(etaEl.textContent!==etaTxt)etaEl.textContent=etaTxt;
+      const txtEl=row.querySelector('.sbg-text');
+      if(txtEl.textContent!==g.text)txtEl.textContent=g.text;
     });
   }
   renderMeta();
@@ -3307,15 +3396,21 @@ function renderBoard(){
 function renderMeta(){
   if(!sess){metaEl.classList.remove('on');return;}
   metaEl.classList.add('on');
-  const fs=focusScore();
+  const pts=sessionPoints();
   const dist=(sess.distractions||[]).length;
-  let html='<span class="sm-time">'+fmtDur(Math.round(elapsedMin()))+' / '+fmtDur(totalPlanMin())+'</span>';
-  if(dist) html+='<span class="sm-dot">·</span><span>'+dist+' distract'+(dist===1?'':'s')+'</span>';
-  if(fs!=null){
-    const cls=fs>=70?'':(fs>=40?' med':' low');
-    html+='<span class="focus-pill'+cls+'">FOCUS '+fs+'</span>';
+  const pausedMin=Math.round((sess.pausedTotal||0)/60000);
+  const focused=elapsedMin();
+  let html='<span class="sm-time">'+fmtDur(Math.round(focused))+' / '+fmtDur(totalPlanMin())+'</span>';
+  if(dist) html+='<span class="sm-dot">·</span><span style="color:#ff8a82">⚠ '+dist+' distract'+(dist===1?'':'s')+' (−'+(dist*2)+')</span>';
+  if(pausedMin>0) html+='<span class="sm-dot">·</span><span style="color:#ffb340">⏸ '+fmtDur(pausedMin)+' paused (−'+pausedMin+')</span>';
+  if(pts!=null){
+    const c=ptsColor(pts,focused);
+    const cls=c==='green'?'':(c==='amber'?' med':' low');
+    const sign=pts>=0?'+':'';
+    html+='<span class="focus-pill'+cls+'">'+sign+pts+' MOMENTUM</span>';
   }
-  metaEl.innerHTML=html;
+  const newHtml=html;
+  if(metaEl._lastHtml!==newHtml){metaEl.innerHTML=newHtml;metaEl._lastHtml=newHtml;}
 }
 
 function checkOverflow(){
@@ -3349,10 +3444,8 @@ async function toggleGoal(i){
   const g=sess.goals[i];
   if(g.doneAt!=null){
     g.doneAt=null;
-    _removeTodayGoal(g);
   } else {
     g.doneAt=Date.now();
-    _pushTodayGoal(g);
   }
   await persist();
   renderBoard();
@@ -3366,13 +3459,11 @@ async function toggleGoal(i){
 
 async function promptAddMore(){
   const left=Math.max(0,Math.round(totalPlanMin()-elapsedMin()));
-  const v=await appConfirm({title:'All goals done! 🎯',body:'You have '+fmtDur(left)+' left. Add more goals to boost your score, or end now (small focus penalty).',okText:'Add more',danger:false});
+  const mul=(sess&&sess._nextMul)||2;
+  const v=await appConfirm({title:'All goals done! 🔥',body:'You have '+fmtDur(left)+' left. Extras = ×'+mul+' positives (next tier ×'+(mul*2)+'). Penalties stay single. Or end now (−1 pt per remaining minute).',okText:'Add ×'+mul,danger:false});
   if(v){ openGoalsModal(true); }
   else {
-    // end early with penalty
-    const remainPct=Math.max(0,(totalPlanMin()-elapsedMin())/totalPlanMin());
-    sess._earlyPenalty=Math.round(remainPct*15);
-    toast('Session ended early — -'+sess._earlyPenalty+' focus');
+    toast('Session ended early — −'+left+' pts');
     await finishSession(true);
   }
 }
@@ -3446,8 +3537,11 @@ function openGoalsModal(addingMore){
   }
   const startTxt=fmtClock(new Date(draftStartMs));
   const endTxt=fmtClock(new Date(draftStartMs+draftBudgetMin*60000));
-  $('sm2Sub').innerHTML=(addingMore?'Add more goals to fill remaining time. ':'Allocate minutes to each goal — totals must fit inside the session. ')+
-    '<b style="color:#7ab8ff">'+startTxt+' → '+endTxt+'</b> ('+fmtDur(draftBudgetMin)+')';
+  const tierNote=addingMore?(' <b style="color:#bf5af2">×'+((sess&&sess._nextMul)||2)+' positives</b> for this batch.'):'';
+  $('sm2Sub').innerHTML=(addingMore?'Add more goals to fill remaining time.':'Allocate minutes per goal — totals must fit. ')+
+    '<b style="color:#7ab8ff">'+startTxt+' → '+endTxt+'</b> ('+fmtDur(draftBudgetMin)+')'+tierNote+
+    '<div style="margin-top:8px;padding:8px 10px;background:rgba(255,159,10,.08);border:1px solid rgba(255,159,10,.2);border-radius:9px;font-size:11.5px;color:#ffb340;line-height:1.45;letter-spacing:-.1px;">'+
+    '💡 Goals shouldn\'t be too easy to finish in the time, nor too hard. Aim for a realistic challenge — beating the slot earns speed bonus, missing it costs you.</div>';
   $('sm2Start').textContent=addingMore?'Resume session':'Start session';
   $('sm2Back').textContent=addingMore?'Cancel':'Back';
   renderDraftGoals();
@@ -3531,15 +3625,17 @@ async function _startSessionFromDraft(){
     if(!goals.length){toast('Add at least one goal');return;}
     const leftover=draftBudgetMin-goals.reduce((s,g)=>s+(g.planMin||0),0);
     if(leftover>0 && goals.length) goals[goals.length-1].planMin=(goals[goals.length-1].planMin||0)+leftover;
+    const nextMul=sess?(((sess._nextMul)||2)):1;
     goals=goals.map(g=>({
       id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
       text:g.text.trim(),
       planMin:Math.max(1,Math.round(g.planMin||1)),
       doneAt:null,
-      todayGoalId:null,
+      mul:nextMul,
     }));
     if(sess){
       sess.goals.push(...goals);
+      sess._nextMul=nextMul*2; // next add-more batch doubles again (2 → 4 → 8 …)
       sess._addMoreShown=false;
       if(sess.stopPendingAt){
         sess.pausedTotal=(sess.pausedTotal||0)+(Date.now()-sess.stopPendingAt);
@@ -3557,6 +3653,7 @@ async function _startSessionFromDraft(){
       planMin:draftBudgetMin,
       extMin:0, pausedTotal:0, stopPendingAt:null,
       goals:goals, distractions:[],
+      _nextMul:2,
     };
     await persist();
     closeAll();
@@ -3623,19 +3720,31 @@ async function finishSession(stoppedEarly){
     sess.stopPendingAt=null;
   }
   const focused=elapsedMin();
-  let fs=focusScore()||0;
-  const penalty=sess._earlyPenalty||0;
-  fs=Math.max(0,fs-penalty);
+  const pausedMin=(sess.pausedTotal||0)/60000;
+  const goalsSnap=sess.goals.map(g=>({text:g.text,planMin:g.planMin,doneAt:g.doneAt,mul:g.mul||1,_start:g._start,_end:g._end}));
+  const pts=_computePoints({
+    goals:goalsSnap,
+    startMs:sess.startMs,
+    pausedMs:sess.pausedTotal||0,
+    distractions:(sess.distractions||[]).length,
+    focusedMin:focused,
+    planMin:sess.planMin||0,
+    pausedMin:pausedMin,
+    stoppedEarly:!!stoppedEarly,
+    live:false,
+  });
   const rec={
     id:sess.id, date:todayKey(),
     startMs:sess.startMs, endMs:Date.now(),
     plannedMin:sess.planMin, extMin:sess.extMin||0,
     focusedMin:Math.round(focused),
+    pausedMin:Math.round(pausedMin),
     goalsTotal:sess.goals.length,
     goalsDone:sess.goals.filter(g=>g.doneAt!=null).length,
     distractions:(sess.distractions||[]).length,
-    focusScore:fs,
-    earlyPenalty:penalty,
+    goals:goalsSnap,
+    points:pts,
+    focusScore:pts, /* legacy field — same value */
     stoppedEarly:!!stoppedEarly,
   };
   await loadHist();
@@ -3834,25 +3943,34 @@ focusCSS.textContent=`
 `;
 document.head.appendChild(focusCSS);
 
-function fsColor(s){return s>=70?'green':(s>=40?'amber':'red');}
 function sessionsForDate(k){return (hist||[]).filter(r=>r.date===k);}
-function dayFocus(k){
-  const rs=sessionsForDate(k);if(!rs.length)return null;
-  let totMin=0,wScore=0;
-  rs.forEach(r=>{const m=Math.max(1,r.focusedMin||0);totMin+=m;wScore+=m*(r.focusScore||0);});
-  if(!totMin)return null;
-  return Math.round(wScore/totMin);
+function habitsDoneCount(k){try{return Object.keys((typeof habitLog!=='undefined'&&habitLog[k])||{}).length;}catch(e){return 0;}}
+function dayPoints(k){
+  const rs=sessionsForDate(k);
+  let pts=0;let any=rs.length>0;
+  rs.forEach(r=>{pts += (r.points!=null?r.points:(r.focusScore||0));});
+  const hp=habitPointsFor(k);
+  if(hp||habitsDoneCount(k))any=true;
+  pts += hp;
+  return any?pts:null;
 }
+function dayFocusedMin(k){return sessionsForDate(k).reduce((s,r)=>s+(r.focusedMin||0),0);}
 function dayDistract(k){return sessionsForDate(k).reduce((s,r)=>s+(r.distractions||0),0);}
-function weekFocus(){
+function weekPoints(){
   const today=new Date();today.setHours(0,0,0,0);
-  let totMin=0,wScore=0;
+  let pts=0;let any=false;
   for(let i=0;i<7;i++){
     const d=new Date(today);d.setDate(today.getDate()-i);
-    const k=keyOf(d);
-    sessionsForDate(k).forEach(r=>{const m=Math.max(1,r.focusedMin||0);totMin+=m;wScore+=m*(r.focusScore||0);});
+    const p=dayPoints(keyOf(d));
+    if(p!=null){pts+=p;any=true;}
   }
-  return totMin?Math.round(wScore/totMin):null;
+  return any?pts:null;
+}
+function weekFocusedMin(){
+  const today=new Date();today.setHours(0,0,0,0);
+  let m=0;
+  for(let i=0;i<7;i++){const d=new Date(today);d.setDate(today.getDate()-i);m+=dayFocusedMin(keyOf(d));}
+  return m;
 }
 
 function buildFocusCard(){
@@ -3864,18 +3982,23 @@ function buildFocusCard(){
     sv.insertBefore(card, sv.querySelector('.history-card')||sv.children[1]||null);
   }
   const today=keyOf(new Date());
-  const dFs=dayFocus(today);
-  const wFs=weekFocus();
+  const dP=dayPoints(today);
+  const wP=weekPoints();
   const dDis=dayDistract(today);
   const todaySess=sessionsForDate(today);
   const todayMin=todaySess.reduce((s,r)=>s+(r.focusedMin||0),0);
+  const dHab=habitsDoneCount(today);
+  const hTotal=(typeof habits!=='undefined'?habits.length:0);
+  const wMin=weekFocusedMin();
   let html='<div class="c-head"><div class="c-title">'+
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>'+
-    'Focus Analysis</div></div>';
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'+
+    'Momentum</div></div>';
+  const dCol=dP==null?'blue':ptsColor(dP,todayMin+dHab*5);
+  const wCol=wP==null?'blue':ptsColor(wP,wMin+dHab*5);
   html+='<div class="focus-row">'+
-    '<div class="focus-tile '+(dFs==null?'blue':fsColor(dFs))+'"><span class="ft-l">Today</span><span class="ft-v">'+(dFs==null?'—':dFs)+'</span><span class="ft-s">'+todaySess.length+' session'+(todaySess.length===1?'':'s')+' · '+fmtDur(Math.round(todayMin))+'</span></div>'+
-    '<div class="focus-tile '+(wFs==null?'blue':fsColor(wFs))+'"><span class="ft-l">Week</span><span class="ft-v">'+(wFs==null?'—':wFs)+'</span><span class="ft-s">7-day weighted avg</span></div>'+
-    '<div class="focus-tile '+(dDis?'red':'blue')+'"><span class="ft-l">Distract</span><span class="ft-v">'+dDis+'</span><span class="ft-s">today</span></div>'+
+    '<div class="focus-tile '+dCol+'"><span class="ft-l">Today</span><span class="ft-v">'+(dP==null?'—':((dP>=0?'+':'')+dP))+'</span><span class="ft-s">'+todaySess.length+' sess · '+fmtDur(Math.round(todayMin))+' · '+dHab+'/'+hTotal+' habits</span></div>'+
+    '<div class="focus-tile '+wCol+'"><span class="ft-l">Week</span><span class="ft-v">'+(wP==null?'—':((wP>=0?'+':'')+wP))+'</span><span class="ft-s">7-day total</span></div>'+
+    '<div class="focus-tile '+(dDis?'red':'blue')+'"><span class="ft-l">Distract</span><span class="ft-v">'+dDis+'</span><span class="ft-s">today · −'+(dDis*2)+' pts</span></div>'+
     '</div>';
   html+='<div class="fc-tabs" id="fcTabs">'+
     '<button data-p="7d" class="'+(_fcPeriod==='7d'?'on':'')+'">7 Days</button>'+
@@ -3895,12 +4018,18 @@ function buildFocusCard(){
 const FA_PER_PAGE=5;
 let _faOpen=false, _faPage=0, _fcPeriod='7d';
 
-function rangeFocus(startDate,endDate){
-  let totMin=0,wScore=0;
+function rangePoints(startDate,endDate){
+  let pts=0;let any=false;
   for(let d=new Date(startDate);d<=endDate;d.setDate(d.getDate()+1)){
-    sessionsForDate(keyOf(d)).forEach(r=>{const m=Math.max(1,r.focusedMin||0);totMin+=m;wScore+=m*(r.focusScore||0);});
+    const p=dayPoints(keyOf(d));
+    if(p!=null){pts+=p;any=true;}
   }
-  return totMin?Math.round(wScore/totMin):null;
+  return any?pts:null;
+}
+function rangeFocusedMin(startDate,endDate){
+  let m=0;
+  for(let d=new Date(startDate);d<=endDate;d.setDate(d.getDate()+1))m+=dayFocusedMin(keyOf(d));
+  return m;
 }
 
 function populateFcChart(){
@@ -3911,28 +4040,34 @@ function populateFcChart(){
   if(_fcPeriod==='7d'){
     for(let i=6;i>=0;i--){
       const d=new Date(today0);d.setDate(today0.getDate()-i);
-      bars.push({fs:dayFocus(keyOf(d)),lbl:['S','M','T','W','T','F','S'][d.getDay()]});
+      const k=keyOf(d);
+      bars.push({pts:dayPoints(k),min:dayFocusedMin(k)+habitsDoneCount(k)*5,lbl:['S','M','T','W','T','F','S'][d.getDay()]});
     }
   } else {
     const weeks=_fcPeriod==='4w'?4:12;
     for(let i=weeks-1;i>=0;i--){
       const end=new Date(today0);end.setDate(today0.getDate()-i*7);
       const start=new Date(end);start.setDate(end.getDate()-6);
-      const fs=rangeFocus(start,end);
-      const lbl=i===0?'NOW':('-'+i+'w');
-      bars.push({fs,lbl});
+      bars.push({pts:rangePoints(start,end),min:rangeFocusedMin(start,end),lbl:i===0?'NOW':('-'+i+'w')});
     }
   }
+  // dynamic scaling — find max absolute pts
+  let maxAbs=0;
+  bars.forEach(b=>{if(b.pts!=null)maxAbs=Math.max(maxAbs,Math.abs(b.pts));});
+  if(maxAbs<10)maxAbs=10;
   bars.forEach((b,i)=>{
     const col=document.createElement('div');col.className='fc-col';
-    const bar=document.createElement('div');bar.className='fc-bar '+(b.fs==null?'empty':fsColor(b.fs));
+    const bar=document.createElement('div');
+    const color=b.pts==null?'empty':ptsColor(b.pts,b.min);
+    bar.className='fc-bar '+color;
     bar.style.height='0%';
-    const val=document.createElement('div');val.className='fc-val';val.textContent=b.fs==null?'—':b.fs;
+    const val=document.createElement('div');val.className='fc-val';
+    val.textContent=b.pts==null?'—':((b.pts>=0?'+':'')+b.pts);
     const lblEl=document.createElement('div');lblEl.className='fc-lbl';lblEl.textContent=b.lbl;
     col.appendChild(bar);col.appendChild(val);col.appendChild(lblEl);
     fc.appendChild(col);
-    const target=b.fs==null?2:Math.max(4,b.fs);
-    setTimeout(()=>{bar.style.height=target+'%';}, 60+i*40);
+    const pct=b.pts==null?2:Math.max(4,Math.min(100,Math.abs(b.pts)/maxAbs*100));
+    setTimeout(()=>{bar.style.height=pct+'%';}, 60+i*40);
   });
 }
 
@@ -3951,23 +4086,44 @@ function buildFocusInfoCard(){
     '<button class="c-head fi-toggle" id="fiToggle" style="display:flex;width:100%;background:transparent;border:none;padding:0;cursor:pointer;color:inherit;font-family:inherit;">'+
       '<div class="c-title" style="flex:1;text-align:left;">'+
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'+
-        'How Focus Score works</div>'+
+        'How Momentum works</div>'+
       '<svg class="fi-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;transition:transform .3s ease;'+(_fiOpen?'transform:rotate(180deg);':'')+'"><path d="M6 9l6 6 6-6"/></svg>'+
     '</button>'+
-    '<div id="fiBody" style="overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:'+(_fiOpen?'2000px':'0')+';opacity:'+(_fiOpen?'1':'0')+';">'+
+    '<div id="fiBody" style="overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:'+(_fiOpen?'3000px':'0')+';opacity:'+(_fiOpen?'1':'0')+';">'+
     '<div style="font-size:13px;color:var(--text-2);line-height:1.55;margin:10px 0 8px;">'+
-      'A blend of <b style="color:var(--text)">what you finished</b> and <b style="color:var(--text)">how steadily you stayed in</b>. 0 to 100 per session.</div>'+
+      'Cumulative score for <b style="color:var(--text)">time studied</b> + <b style="color:var(--text)">on-time goals</b> + <b style="color:var(--text)">habit consistency</b>. No cap, can go negative. Compounds when you push past your original plan.</div>'+
     '<div class="fi-formula">'+
-      '<b>core</b> = goalsDone/total × 0.7 &nbsp;+&nbsp; elapsed/plan × 0.3<br>'+
-      '<b>score</b> = core × (1 − distractPen − latePen) × 100<br>'+
-      '<span style="color:var(--text-3)">distractPen = min(0.40, count × 0.05)</span><br>'+
-      '<span style="color:var(--text-3)">latePen = min(0.30, overdueGoals × 0.08)</span>'+
+      '<span style="color:var(--text-3)">/* per session */</span><br>'+
+      '<b>+1</b> per focused minute<br>'+
+      '<b>+planMin × 0.5 × mul</b> per goal completed (base bonus)<br>'+
+      '<b>+(slot − doneMin) × mul</b> speed bonus if finished before slot end<br>'+
+      '<span style="color:#ff8a82"><b>−(over − slot) × 1.5</b> if late or still undone past slot (NEVER ×mul)</span><br>'+
+      '<span style="color:#ff8a82"><b>−2</b> per distraction tap</span><br>'+
+      '<span style="color:#ff8a82"><b>−1</b> per minute paused</span><br>'+
+      '<span style="color:#ff8a82"><b>−(plan − focused)</b> if stopped early</span><br><br>'+
+      '<span style="color:var(--text-3)">/* tier chain when add-more fires */</span><br>'+
+      '<b style="color:#bf5af2">mul</b>: original goals ×1 → 1st extras ×2 → 2nd ×4 → 3rd ×8 → … (positives only)<br><br>'+
+      '<span style="color:var(--text-3)">/* per day */</span><br>'+
+      '<b style="color:#5ee577">habitPts = done² / total × 5</b> &nbsp;<span style="color:var(--text-3)">— rewards ratio, not count</span><br>'+
+      '<b>day total</b> = Σ session pts + habitPts'+
     '</div>'+
     '<div class="fi-rows">'+
-      '<div class="fi-row"><div class="fi-ic g">✓</div><div class="fi-mid"><b>Finishing goals</b> drives 70% of your score. Done = +, undone = 0.</div></div>'+
-      '<div class="fi-row"><div class="fi-ic b">⏱</div><div class="fi-mid"><b>Time on task</b> adds the other 30% — partial credit while a goal is still in progress.</div></div>'+
-      '<div class="fi-row"><div class="fi-ic r">⚠</div><div class="fi-mid"><b>Each distraction</b> tap = −5% (caps at −40%). Every goal past its slot = −8% (caps at −30%).</div></div>'+
-      '<div class="fi-row"><div class="fi-ic a">★</div><div class="fi-mid"><b>Day &amp; Week</b> = focused-minute weighted average of session scores. Longer sessions weigh more.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic g">⏱</div><div class="fi-mid"><b>Time on task</b> is the steady base — +1 every minute the timer is running.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic g">✓</div><div class="fi-mid"><b>Finish on time</b> = flat bonus (planMin × 0.5). Finish <i>early</i> = speed bonus on top. Both scale with the tier multiplier.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic b">⚡</div><div class="fi-mid"><b>Tier chain</b>: clear all goals with time left → next batch is ×2. Clear those too → ×4. Again → ×8. Compounds infinitely. Penalties never multiply, so chasing the chain is always +EV.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic a">🎯</div><div class="fi-mid"><b>Habits reward ratio, not count.</b> 10/10 habits done (50 pts) beats 20/100 (20 pts). Don\'t pad your habit list to game the score.</div></div>'+
+      '<div class="fi-row"><div class="fi-ic r">⚠</div><div class="fi-mid"><b>Penalties shown live</b>: distractions (−2 each, kept small so you stay truthful), pause (−1/min), late goals (−1.5/min over). Stopping early kills the remaining-plan minutes.</div></div>'+
+    '</div>'+
+    '<div class="fi-tips">'+
+      '<div class="ti-hd">Tips to climb Momentum</div>'+
+      '<div class="fi-tip"><span class="num">1</span><span>Pick a session length you can actually sit through — the +1/min base does serious lifting.</span></div>'+
+      '<div class="fi-tip"><span class="num">2</span><span>Goldilocks goals: hard enough that the time bonus is meaningful, easy enough you finish before the slot.</span></div>'+
+      '<div class="fi-tip"><span class="num">3</span><span>Chase the tier chain. Each cleared batch doubles the next. 30 pts at ×8 = +240. Never end early when time remains.</span></div>'+
+      '<div class="fi-tip"><span class="num">4</span><span>Keep your habit list tight. Fewer habits, all done, beats a bloated list half-done.</span></div>'+
+      '<div class="fi-tip"><span class="num">5</span><span>Pause sparingly. A 5-min pause = −5. Push through if you can.</span></div>'+
+      '<div class="fi-tip"><span class="num">6</span><span>Be truthful with the distract button. −2 is tiny. Lying poisons your own dashboard.</span></div>'+
+      '<div class="fi-tip"><span class="num">7</span><span>Stopping with 20 min left = −20. Even idle, +1/min keeps you in green.</span></div>'+
+      '<div class="fi-tip"><span class="num">8</span><span>Stack habits on study days — both streams pour into the same day total.</span></div>'+
     '</div>'+
     '</div>';
   document.getElementById('fiToggle').onclick=()=>{
@@ -4027,11 +4183,15 @@ function renderFaSessions(todaySess){
   fl.innerHTML='';
   slice.forEach(r=>{
     const row=document.createElement('div');row.className='fa-row';
-    const cls=fsColor(r.focusScore||0);
+    const pts=r.points!=null?r.points:(r.focusScore||0);
+    const cls=ptsColor(pts,r.focusedMin||0);
     const t1=fmtClock(new Date(r.startMs))+' → '+fmtClock(new Date(r.endMs));
-    const t2=fmtDur(r.focusedMin||0)+' · '+r.goalsDone+'/'+r.goalsTotal+' goals · '+(r.distractions||0)+' distract'+(r.stoppedEarly?' · stopped early':'');
-    row.innerHTML='<div class="fa-tm">'+t1+'</div><div class="fa-mid"><div class="t1">'+(r.goalsDone===r.goalsTotal?'Completed':'Partial')+'</div><div class="t2">'+t2+'</div></div>'+
-      '<span class="focus-pill '+(cls==='green'?'':(cls==='amber'?'med':'low'))+'">'+(r.focusScore||0)+'</span>';
+    const bits=[fmtDur(r.focusedMin||0),r.goalsDone+'/'+r.goalsTotal+' goals'];
+    if(r.distractions)bits.push('⚠'+r.distractions);
+    if(r.pausedMin)bits.push('⏸'+fmtDur(r.pausedMin));
+    if(r.stoppedEarly)bits.push('stopped early');
+    row.innerHTML='<div class="fa-tm">'+t1+'</div><div class="fa-mid"><div class="t1">'+(r.goalsDone===r.goalsTotal?'Completed':'Partial')+'</div><div class="t2">'+bits.join(' · ')+'</div></div>'+
+      '<span class="focus-pill '+(cls==='green'?'':(cls==='amber'?'med':'low'))+'">'+(pts>=0?'+':'')+pts+'</span>';
     fl.appendChild(row);
   });
   if(pages>1){
@@ -4080,24 +4240,28 @@ if(typeof window.openDay==='function'){
         else sheet.appendChild(fb);
       }
       const rs=sessionsForDate(key);
-      const fs=dayFocus(key);
+      const dp=dayPoints(key);
       const dis=dayDistract(key);
       const totMin=rs.reduce((s,r)=>s+(r.focusedMin||0),0);
+      const hc=habitsDoneCount(key);
+      const hTotal=(typeof habits!=='undefined'?habits.length:0);
+      const hp=habitPointsFor(key);
       let html='<div class="sheet-focus">'+
-        '<div class="sf-pill"><div class="l">Focus</div><div class="v">'+(fs==null?'—':fs)+'</div></div>'+
+        '<div class="sf-pill"><div class="l">Momentum</div><div class="v">'+(dp==null?'—':((dp>=0?'+':'')+dp))+'</div></div>'+
         '<div class="sf-pill"><div class="l">Sessions</div><div class="v">'+rs.length+'</div></div>'+
         '<div class="sf-pill"><div class="l">Focused</div><div class="v">'+fmtDur(Math.round(totMin))+'</div></div>'+
-        '<div class="sf-pill"><div class="l">Distract</div><div class="v">'+dis+'</div></div>'+
+        '<div class="sf-pill"><div class="l">Habits</div><div class="v">'+hc+'/'+hTotal+'<span style="font-size:11px;color:var(--text-3);margin-left:4px">+'+hp+'</span></div></div>'+
         '</div>';
       if(rs.length){
         html+='<div class="fa-list" style="margin-bottom:14px">';
         rs.slice().sort((a,b)=>a.startMs-b.startMs).forEach(r=>{
-          const cls=fsColor(r.focusScore||0);
+          const pts=r.points!=null?r.points:(r.focusScore||0);
+          const cls=ptsColor(pts,r.focusedMin||0);
           html+='<div class="fa-row">'+
             '<div class="fa-tm">'+fmtClock(new Date(r.startMs))+'</div>'+
             '<div class="fa-mid"><div class="t1">'+(r.goalsDone===r.goalsTotal?'Completed':'Partial')+'</div>'+
             '<div class="t2">'+fmtDur(r.focusedMin||0)+' · '+r.goalsDone+'/'+r.goalsTotal+' goals · '+r.distractions+'×</div></div>'+
-            '<span class="focus-pill '+(cls==='green'?'':(cls==='amber'?'med':'low'))+'">'+(r.focusScore||0)+'</span></div>';
+            '<span class="focus-pill '+(cls==='green'?'':(cls==='amber'?'med':'low'))+'">'+(pts>=0?'+':'')+pts+'</span></div>';
         });
         html+='</div>';
       }
