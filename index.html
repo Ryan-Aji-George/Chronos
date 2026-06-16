@@ -884,8 +884,11 @@ body{
 html.locked .app,html.locked .tabbar,html.locked .install,html.locked .toast,
 html.locked .sheet,html.locked .sheet-bg,html.locked .modal,html.locked .modal-bg{display:none!important;}
 /* all-goals sheet row */
-#goalsAllList .gs-row{display:flex;align-items:center;gap:8px;padding:11px 12px;
-  background:var(--card);border:0.5px solid var(--hair);border-radius:13px;transition:background .15s ease;}
+#goalsAllList .gs-row{display:flex;align-items:center;gap:10px;padding:11px 12px;
+  background:var(--card);border:0.5px solid var(--hair);border-radius:13px;transition:background .15s ease,opacity .2s ease;}
+#goalsAllList .gs-num{flex:none;width:24px;height:24px;border-radius:8px;background:rgba(255,255,255,.05);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--text-3);
+  font-variant-numeric:tabular-nums;}
 #goalsAllList .gs-row.done{opacity:.55;}
 #goalsAllList .gs-row .gs-check{flex:none;width:24px;height:24px;border:1.8px solid var(--text-3);border-radius:8px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;background:rgba(255,255,255,.02);}
@@ -1975,6 +1978,8 @@ function renderGoalsSheet(){
   if(!userGoals.length){wrap.innerHTML='<div class="gs-empty">No goals yet — add one above</div>';return;}
   userGoals.forEach((g,i)=>{
     const row=document.createElement('div');row.className='gs-row'+(g.done?' done':'');
+    const num=document.createElement('div');num.className='gs-num';num.textContent=(i+1);
+    row.appendChild(num);
     const chk=document.createElement('div');chk.className='gs-check'+(g.done?' on':'');
     chk.onclick=async()=>{g.done=!g.done;g.doneAt=g.done?Date.now():null;await saveUserGoals();renderGoalsSheet();renderGoals();};
     const txt=document.createElement('div');txt.className='gs-text';txt.textContent=g.text;
@@ -2665,7 +2670,7 @@ function prepareView(v){
   if(v==='habits')renderHabitsAll();
   if(v==='timer')autoGrowNotes();
   el.scrollTop=0;
-  el.querySelectorAll('.timer-hero,.card,.stat-grid,.s-hd').forEach(x=>{x.style.animation='none';void x.offsetWidth;x.style.animation='';});
+  // animation re-trigger removed — caused visible flash on every re-entry post-slide
 }
 function switchView(v,dir,skipPrep){
   const prev=getCurrentView();if(v===prev)return;
@@ -3497,10 +3502,10 @@ css.textContent=`
   box-shadow:0 4px 12px rgba(48,209,88,.18);}
 .focus-pill.med{background:linear-gradient(180deg,rgba(255,159,10,.22),rgba(255,159,10,.1));border-color:rgba(255,159,10,.35);color:#ffb340;box-shadow:0 4px 12px rgba(255,159,10,.18);}
 .focus-pill.low{background:linear-gradient(180deg,rgba(255,69,58,.22),rgba(255,69,58,.1));border-color:rgba(255,69,58,.35);color:#ff6b60;box-shadow:0 4px 12px rgba(255,69,58,.18);}
-.distract-btn{display:none;margin:0;padding:8px 12px;border:0.5px solid rgba(255,69,58,.4);
-  background:rgba(255,69,58,.1);color:#ff6b60;border-radius:11px;font-size:12px;font-weight:700;
+.distract-btn{display:none;margin:0;padding:10px 14px;border:0.5px solid rgba(255,69,58,.4);
+  background:rgba(255,69,58,.1);color:#ff6b60;border-radius:12px;font-size:12.5px;font-weight:700;
   cursor:pointer;font-family:inherit;letter-spacing:-.1px;align-items:center;gap:6px;transition:.15s;
-  flex:none;white-space:nowrap;}
+  flex:none;white-space:nowrap;min-height:40px;-webkit-tap-highlight-color:transparent;}
 .sess-strip.on .distract-btn{display:inline-flex;}
 .sess-strip .focus-pill{padding:5px 10px;font-size:11px;letter-spacing:.4px;border-radius:11px;}
 .distract-btn:active{transform:scale(.92);background:rgba(255,69,58,.22);}
@@ -4276,6 +4281,11 @@ focusCSS.textContent=`
 #statsView>.card:first-child,#statsView>.widget-pager:first-child{margin-top:4px;}
 /* compact mode for fewer scrolls */
 #statsView>.card{padding:16px;}
+/* universal touch polish */
+button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-btn{-webkit-tap-highlight-color:transparent;}
+*:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:6px;}
+/* friendlier empty states */
+.empty,.fa-empty,.gs-empty{font-size:13px;color:var(--text-3);text-align:center;padding:22px 12px;letter-spacing:-.1px;line-height:1.5;}
 /* touch tap feedback */
 #statsView>.card,#statsView .mh-cell,#statsView .mh-vs,#statsView .stat{transition:transform .15s cubic-bezier(.22,1,.36,1),box-shadow .2s ease;}
 #statsView>.card:active{transform:scale(.985);}
