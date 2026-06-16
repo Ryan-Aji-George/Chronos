@@ -2051,14 +2051,15 @@ async function buildStats(){
     col.innerHTML='<div class="cv">'+(hrs>=0.05?hrs.toFixed(1):'')+'</div><div class="bw"><div class="bar'+(x.today?' tdy':'')+'"></div></div><div class="cl">'+x.label+'</div>';
     col.title=x.k;col.onclick=()=>openDay(x.k);chart.appendChild(col);
     const bar=col.querySelector('.bar');
-    // px-based height — % was resolving against collapsed parent in some layouts
-    requestAnimationFrame(()=>{
+    const _setH=(tries)=>{
       const bw=bar.parentElement;
-      const bwH=(bw&&bw.clientHeight)||80;
+      const bwH=bw?bw.clientHeight:0;
+      if(bwH<=0&&tries<40){requestAnimationFrame(()=>_setH(tries+1));return;}
+      const effH=bwH>0?bwH:80;
       const ratio=mx>0?x.ms/mx:0;
-      const px=Math.max(6,Math.round(ratio*bwH));
-      bar.style.height=px+'px';
-    });
+      bar.style.height=Math.max(6,Math.round(ratio*effH))+'px';
+    };
+    requestAnimationFrame(()=>_setH(0));
   });
   // scroll to rightmost (today) by default — retry across paints in case card not laid out yet
   function _scrollEnd(){try{chart.scrollLeft=chart.scrollWidth;}catch(e){}}
@@ -2680,11 +2681,12 @@ function switchView(v,dir,skipPrep){
   if(prev==='timer'&&typeof _visionRelock==='function')_visionRelock();
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
   moveTabInd(document.querySelector('.tab.active'));
-  if(!skipPrep)prepareView(v);
+  // toggle .hidden BEFORE prepareView so buildStats / chart can measure clientHeight
   document.getElementById('timerView').classList.toggle('hidden',v!=='timer');
   document.getElementById('statsView').classList.toggle('hidden',v!=='stats');
   document.getElementById('habitsView').classList.toggle('hidden',v!=='habits');
   document.body.classList.toggle('view-timer',v==='timer');
+  if(!skipPrep)prepareView(v);
 }
 document.querySelectorAll('.tab').forEach(t=>{t.onclick=()=>{
   if(document.documentElement.classList.contains('locked'))return;
