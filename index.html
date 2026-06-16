@@ -2040,7 +2040,8 @@ async function buildStats(){
     allDays.push({k:_k,label:['S','M','T','W','T','F','S'][_dd.getDay()],ms:(map[_k]?map[_k].elapsed:0)||0,today:_k===state.date});
   }
   const _scaleSlice=allDays.slice(-7);
-  const mx=Math.max.apply(null,_scaleSlice.map(x=>x.ms).concat([3600000]));
+  let mx=Math.max.apply(null,_scaleSlice.map(x=>x.ms));
+  if(!mx||!isFinite(mx))mx=1;
   // size each col so exactly 7 fit per viewport; surplus days extend left for scroll
   const _gap=8,_pad=8;
   const _vw=Math.max(220,(chart.clientWidth||chart.parentElement.clientWidth||320)-_pad);
