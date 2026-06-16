@@ -2030,18 +2030,24 @@ async function buildStats(){
   document.getElementById('sDays').textContent=_realDays.length;
   document.getElementById('sAvg').innerHTML=(_realDays.length?totalMs/3600000/_realDays.length:0).toFixed(1)+'<span class="u">h</span>';
 
-  // bar chart — strictly last 7 days (today-6 to today)
+  // bar chart — horizontally scrollable, ALL stored days, scroll defaults to rightmost (today)
   const chart=document.getElementById('chart');chart.innerHTML='';
   const _today=new Date();_today.setHours(0,0,0,0);
-  const _firstD=new Date(_today);_firstD.setDate(_today.getDate()-6);
+  const _keys=Object.keys(map).sort();
+  let _firstD;
+  if(_keys.length){_firstD=new Date(_keys[0]+'T00:00:00');_firstD.setHours(0,0,0,0);}
+  else{_firstD=new Date(_today);_firstD.setDate(_today.getDate()-6);}
+  const _minStart=new Date(_today);_minStart.setDate(_today.getDate()-6);
+  if(_firstD>_minStart)_firstD=_minStart;
   const allDays=[];
-  for(let i=0;i<7;i++){
-    const _dd=new Date(_firstD);_dd.setDate(_firstD.getDate()+i);
+  for(let _dd=new Date(_firstD);_dd<=_today;_dd.setDate(_dd.getDate()+1)){
     const _k=keyOf(_dd);
     allDays.push({k:_k,label:['S','M','T','W','T','F','S'][_dd.getDay()],ms:(map[_k]?map[_k].elapsed:0)||0,today:_k===state.date});
   }
-  let mx=Math.max.apply(null,allDays.map(x=>x.ms));
-  if(!mx||!isFinite(mx))mx=1;
+  // scale to max of LAST 7 visible days (so default view bars are proportional)
+  const _last7=allDays.slice(-7);
+  let mx=Math.max.apply(null,_last7.map(x=>x.ms));
+  if(!mx||!isFinite(mx)||mx<=0)mx=1;
   // size each col so exactly 7 fit per viewport; surplus days extend left for scroll
   const _gap=8,_pad=8;
   const _vw=Math.max(220,(chart.clientWidth||chart.parentElement.clientWidth||320)-_pad);
@@ -2745,7 +2751,7 @@ document.body.classList.add('view-timer');
     const name=VIEW_ORDER[tIdx];
     const el=viewById(name);
     el.classList.remove('hidden');
-    prepareView(name);
+    // prepareView deferred to AFTER commit — running mid-swipe caused visible re-render flash
     el.classList.add('swipe-in');
     applyStageBox(el);
     el.style.zIndex='3';
@@ -2810,7 +2816,7 @@ document.body.classList.add('view-timer');
     if(nextView){nextView.classList.add('swipe-snap','committed');nextView.classList.remove('swipe-drag');
       nextView.style.transform='translate3d(0,0,0)';}
     const oldCur=curView,oldNext=nextView;nextView=null;
-    pendingFinalize=()=>{resetStage(oldCur);resetStage(oldNext);switchView(toName,0,true);};
+    pendingFinalize=()=>{resetStage(oldCur);resetStage(oldNext);switchView(toName,0,true);try{prepareView(toName);}catch(e){}};
     pendingTimer=setTimeout(()=>{pendingTimer=null;const f=pendingFinalize;pendingFinalize=null;if(f)f();},500);
   }
   function onEnd(){
@@ -2848,7 +2854,7 @@ document.body.classList.add('view-timer');
     curView.classList.add('swipe-out');curView.style.zIndex='1';
     const el=viewById(toName);
     el.classList.remove('hidden');
-    prepareView(toName);
+    // prepareView deferred to commit finalize — running here caused visible re-render mid-slide
     el.classList.add('swipe-in');
     applyStageBox(el);
     el.style.zIndex='3';
