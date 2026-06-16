@@ -95,13 +95,18 @@ body{
   text-transform:uppercase;line-height:1;
   font-variant-numeric:tabular-nums;}
 
-.view{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px 16px 116px;
+.view{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px 16px 116px;background:var(--bg);
   will-change:transform,opacity;transform:translate3d(0,0,0);}
 .view::-webkit-scrollbar{width:0;}
 .hidden{display:none!important;}
 /* view swipe transitions - iOS card slide */
 .view.swipe-out{will-change:transform,opacity,filter;backface-visibility:hidden;}
-.view.swipe-in{position:fixed!important;left:0;right:0;will-change:transform,opacity;backface-visibility:hidden;}
+.view.swipe-in{position:fixed!important;left:0;right:0;top:0!important;bottom:0!important;will-change:transform,opacity,filter;backface-visibility:hidden;background:var(--bg)!important;z-index:3;}
+/* blur incoming during drag so content stays hidden until commit reveals via loader */
+.view.swipe-in.swipe-drag{filter:blur(16px) brightness(.45) saturate(.6);}
+.view.swipe-out.swipe-drag{filter:blur(2px) brightness(.7);}
+/* hide outgoing view's chrome that could peek during slide */
+.view.swipe-out #settingsBtn,.view.swipe-out .vision-actions,.view.swipe-out .vision-wrap{visibility:hidden;}
 .view.swipe-drag{transition:none!important;}
 .view.swipe-snap{transition:transform .5s cubic-bezier(.22,1,.36,1),filter .4s ease;}
 /* outgoing dim via filter */
@@ -115,6 +120,7 @@ body{
 
 /* ===== timer ===== */
 .timer-hero{display:flex;flex-direction:column;align-items:center;padding:22px 0 6px;}
+/* t-target CSS removed — widget no longer on timer page */
 .dial{position:relative;width:min(82vw,320px);aspect-ratio:1;display:grid;place-items:center;}
 /* outer bloom — conic glow */
 .dial::before{content:"";position:absolute;inset:-12%;border-radius:50%;
@@ -872,6 +878,16 @@ body{
 /* passcode lock */
 html.locked .app,html.locked .tabbar,html.locked .install,html.locked .toast,
 html.locked .sheet,html.locked .sheet-bg,html.locked .modal,html.locked .modal-bg{display:none!important;}
+/* ============ VIEW LOADER ============ */
+#viewLoader{position:fixed;top:54px;left:0;right:0;bottom:62px;z-index:15;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);opacity:0;pointer-events:none;}
+#viewLoader.on{opacity:1;pointer-events:auto;}
+#viewLoader.fading{transition:opacity .28s cubic-bezier(.22,1,.36,1);}
+.vl-spin{width:42px;height:42px;border-radius:50%;border:2.5px solid rgba(255,255,255,.08);
+  border-top-color:#0a84ff;animation:vlSpin .85s linear infinite;
+  box-shadow:0 0 24px rgba(10,132,255,.3);}
+@keyframes vlSpin{to{transform:rotate(360deg);}}
+html.locked #viewLoader{display:none!important;}
 /* all-goals sheet row */
 #goalsAllList .gs-row{display:flex;align-items:center;gap:10px;padding:11px 12px;
   background:var(--card);border:0.5px solid var(--hair);border-radius:13px;transition:background .15s ease,opacity .2s ease;}
@@ -1302,12 +1318,8 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
     <div class="card">
       <div class="c-head">
         <div class="c-title">Every Day</div>
-        <button class="collapse-toggle" id="everyDayToggle" aria-label="Toggle every day section">
-          <span class="ct-label" id="histChip">—</span>
-          <svg class="ct-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
+        <span class="chip" id="histChip">—</span>
       </div>
-      <div class="collapsible collapsed" id="everyDayPanel"><div class="collapsible-inner">
       <div class="search-box">
         <svg class="search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="histSearch" placeholder="Search by date or goal…" maxlength="60">
@@ -1324,7 +1336,6 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
         <span class="pg-info" id="pgInfo">1 / 1</span>
         <button class="pg-btn" id="pgNext" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
-      </div></div>
     </div>
 
     <button class="reset-row settings-btn" id="settingsBtn" style="margin-top:14px">
@@ -1426,6 +1437,13 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
       </div>
     </div>
   </div>
+
+  <div class="sheet-sec" style="margin-top:18px">Commitment</div>
+  <button class="reset-row" id="setTargetBtn">
+    <div class="rr-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+    <div class="rr-text"><div class="rr-title">Daily focus target</div><div class="rr-sub" id="setTargetSub">Set how many minutes you commit to daily</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
 
   <div class="sheet-sec" style="margin-top:18px">Security</div>
   <button class="reset-row" id="changePassBtn">
@@ -1565,6 +1583,11 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
   <button class="ib no" id="installNo">Later</button>
 </div>
 
+<!-- view-transition loader -->
+<div id="viewLoader" aria-hidden="true">
+  <div class="vl-spin"></div>
+</div>
+
 <!-- in-app modal (confirm + prompt) -->
 <div class="modal-bg" id="modalBg"></div>
 <div class="modal" id="modal" role="dialog" aria-modal="true">
@@ -1699,6 +1722,7 @@ function render(){const ms=currentMs();const f=fmt(ms);const html=f.hms+'<span c
   // live stats if stats view open
   if(!document.getElementById('statsView').classList.contains('hidden'))liveStats();
 }
+/* daily target widget removed from timer page — stays in stats hero */
 function tick(){render();raf=requestAnimationFrame(tick);}
 let raf=null;
 
@@ -1718,6 +1742,31 @@ document.getElementById('resetBtn').onclick=reset;
 
 /* ---------- stats: data management ---------- */
 document.getElementById('changePassBtn').onclick=()=>{if(window.changePasscode)window.changePasscode();};
+(function(){
+  const btn=document.getElementById('setTargetBtn');if(!btn)return;
+  async function _refresh(){
+    try{
+      const t=(typeof window._dailyTarget==='number'?window._dailyTarget:120);
+      const sub=document.getElementById('setTargetSub');
+      if(sub)sub.textContent='Currently: '+fmtDur(t)+'/day · tap to change';
+    }catch(e){}
+  }
+  _refresh();
+  const sBtn=document.getElementById('settingsBtn');
+  if(sBtn){const orig=sBtn.onclick;sBtn.onclick=function(e){_refresh();if(typeof orig==='function')orig.call(this,e);};}
+  btn.onclick=async()=>{
+    const cur=(typeof window._dailyTarget==='number'?window._dailyTarget:120);
+    const v=await appPrompt({title:'Daily focus target',body:'Minutes of focused study per day. Build streak by hitting this every day.',value:String(cur),placeholder:'120',okText:'Save',type:'text',inputmode:'numeric',maxlength:4});
+    if(v==null)return;
+    const n=parseInt(String(v).replace(/\D/g,''),10);
+    if(!n||n<5||n>1440){toast('Pick 5–1440 minutes');return;}
+    window._dailyTarget=n;
+    try{await kvPut('dailyTarget',n);}catch(e){}
+    await _refresh();
+    toast('Target set to '+fmtDur(n)+'/day');
+    try{if(!document.getElementById('statsView').classList.contains('hidden'))buildFocusCard();}catch(e){}
+  };
+})();
 document.getElementById('resetTodayBtn').onclick=async()=>{
   if(!(await appConfirm({title:'Reset today?',body:"This clears today's timer and goals. History, notes, and other days are kept.",okText:'Reset',danger:true})))return;
   state.elapsed=0;state.running=false;state.startTs=0;state.goals=[];
@@ -1727,6 +1776,13 @@ document.getElementById('factoryResetBtn').onclick=async()=>{
   if(!(await appConfirm({title:'Factory reset?',body:"Permanently erases EVERYTHING — timers, goals, notes, habits, habit history, settings. Cannot be undone.",okText:'Continue',danger:true})))return;
   if(!(await appConfirm({title:'Are you sure?',body:'Last chance. All data will be deleted.',okText:'Delete all',danger:true})))return;
   await wipeAll();
+  // wipe ALL kv keys explicitly (in case wipeAll missed any from prior schema)
+  for(const k of ['notes','habits','habitLog','habitAuto','visionBoard','sessions','activeSession','userGoals','passcode','dailyTarget']){
+    try{await kvPut(k,k==='notes'?'':(k==='visionBoard'||k==='activeSession'||k==='passcode'?null:(k==='habitLog'||k==='habitAuto'?{}:(k==='dailyTarget'?120:[]))));}catch(e){}
+  }
+  window._dailyTarget=120;
+  // clear localStorage stragglers + sessionStorage flags
+  try{['chronos_inst','chronos_days','chronos_kv','_appBooted'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}try{sessionStorage.removeItem(k);}catch(e){}});}catch(e){}
   // reset in-memory state
   state.date=todayKey();state.elapsed=0;state.running=false;state.startTs=0;state.goals=[];
   globalNotes='';
@@ -1734,11 +1790,12 @@ document.getElementById('factoryResetBtn').onclick=async()=>{
   if(typeof userGoals!=='undefined')userGoals=[];
   const hs=document.getElementById('habitSearch');if(hs)hs.value='';
   const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
-  try{localStorage.removeItem('chronos_inst');}catch(e){}
-  await loadDay();await kvPut('notes','');await kvPut('habitAuto',{});await kvPut('userGoals',[]);
+  await loadDay();
   try{_visionShow(null);}catch(e){}
   try{if(typeof _sessInit==='function')await _sessInit();}catch(e){}
-  syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();toast('Everything reset');
+  try{if(typeof loadUserGoals==='function')await loadUserGoals();}catch(e){}
+  syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();
+  toast('Factory reset complete — everything cleared');
 };
 
 /* ---------- export / import (JSON backup) ---------- */
@@ -1747,16 +1804,17 @@ async function buildBackup(){
   const days=await dbAll();
   const dayMap={};days.forEach(d=>dayMap[d.date]=d);
   dayMap[state.date]={date:state.date,elapsed:currentMs(),goals:state.goals};
-  let visionBoard=null,sessions=null,activeSession=null,userGoalsKv=null,passcode=null;
+  let visionBoard=null,sessions=null,activeSession=null,userGoalsKv=null,passcode=null,dailyTarget=null;
   try{visionBoard=await kvGet('visionBoard');}catch(e){}
   try{sessions=await kvGet('sessions');}catch(e){}
   try{activeSession=await kvGet('activeSession');}catch(e){}
   try{userGoalsKv=await kvGet('userGoals');}catch(e){}
   try{passcode=await kvGet('passcode');}catch(e){}
+  try{dailyTarget=await kvGet('dailyTarget');}catch(e){}
   return {
     app:'Chronos',
     type:'chronos-backup',
-    version:4,
+    version:5,
     exportedAt:new Date().toISOString(),
     days:Object.values(dayMap),
     notes:globalNotes,
@@ -1767,7 +1825,8 @@ async function buildBackup(){
     sessions:Array.isArray(sessions)?sessions:[],
     activeSession:activeSession||null,
     userGoals:Array.isArray(userGoalsKv)?userGoalsKv:[],
-    passcode:typeof passcode==='string'?passcode:null
+    passcode:typeof passcode==='string'?passcode:null,
+    dailyTarget:typeof dailyTarget==='number'?dailyTarget:120
   };
 }
 document.getElementById('exportBtn').onclick=async()=>{
@@ -1806,6 +1865,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
     await kvPut('activeSession',parsed.activeSession||null);
     await kvPut('userGoals',Array.isArray(parsed.userGoals)?parsed.userGoals:[]);
     if(typeof parsed.passcode==='string'&&/^\d{6}$/.test(parsed.passcode))await kvPut('passcode',parsed.passcode);
+    if(typeof parsed.dailyTarget==='number'&&parsed.dailyTarget>=5)await kvPut('dailyTarget',parsed.dailyTarget);
     // refresh in-memory state
     await loadDay();
     try{await loadUserGoals();pruneDoneGoals();}catch(e){}
@@ -2131,7 +2191,9 @@ async function buildStats(){
       const tk=keyOf(today);_heatFocused[tk]=(_heatFocused[tk]||0)+liveMs;
     }
   }catch(e){}
-  let maxH=0;Object.keys(_heatFocused).forEach(k=>{maxH=Math.max(maxH,_heatFocused[k]/3600000);});maxH=Math.max(maxH,1);
+  // scale to greatest existing focused-hours value (no floor — dim days proportional to record)
+  let maxH=0;Object.keys(_heatFocused).forEach(k=>{maxH=Math.max(maxH,_heatFocused[k]/3600000);});
+  if(maxH<=0)maxH=0.0167; // 1-min fallback to avoid div-by-zero
   for(let i=0;i<totalDays;i++){const d=new Date(start);d.setDate(d.getDate()+i);const k=keyOf(d);
     const ms=_heatFocused[k]||0;const hrs=ms/3600000;
     const cell=document.createElement('div');cell.className='cell';
@@ -2704,7 +2766,7 @@ function wireCollapse(btnId,panelId,openByDefault){
   btn.onclick=()=>set(panel.classList.contains('collapsed'));
   _collapse[panelId]={set,isOpen:()=>!panel.classList.contains('collapsed')};
 }
-wireCollapse('everyDayToggle','everyDayPanel',false);
+/* everyDay collapse removed — always expanded */
 // Manage panel: open by default when there are no habits yet (so the add field is reachable)
 wireCollapse('manageToggle','managePanel', false);
 document.getElementById('hpPrev').onclick=()=>{if(_hPage>0){_hPage--;renderHabitTable();document.getElementById('habitTableWrap').scrollIntoView({behavior:'smooth',block:'nearest'});}};
@@ -2724,29 +2786,72 @@ window.addEventListener('load',()=>moveTabInd(document.querySelector('.tab.activ
 window.addEventListener('resize',()=>moveTabInd(document.querySelector('.tab.active')));
 const VIEW_ORDER=['timer','habits','stats'];
 function getCurrentView(){const t=document.querySelector('.tab.active');return t?t.dataset.view:'timer';}
+/* per-view scroll memory: first visit starts at top, revisit restores last position */
+window._viewScrollMem=window._viewScrollMem||{};
+window._viewsVisited=window._viewsVisited||new Set();
+function _viewTargetY(v){
+  if(!window._viewsVisited.has(v))return 0;
+  return window._viewScrollMem[v]||0;
+}
 function prepareView(v){
   const el=document.getElementById(v+'View');
   if(!el)return;
+  const targetY=_viewTargetY(v);
+  // set scroll BEFORE build so chart/heatmap render with correct position context
+  el.scrollTop=targetY;
   if(v==='stats')buildStats();
   if(v==='habits')renderHabitsAll();
   if(v==='timer')autoGrowNotes();
-  // smooth scroll to top (not abrupt snap) if view is mid-scroll
-  try{
-    if(el.scrollTop>4)el.scrollTo({top:0,behavior:'smooth'});
-    else el.scrollTop=0;
-  }catch(e){el.scrollTop=0;}
+  // post-build: re-pin scroll (clamped to actual scrollHeight) to defeat any layout shifts
+  const restore=()=>{
+    const maxY=Math.max(0,el.scrollHeight-el.clientHeight);
+    el.scrollTop=Math.min(targetY,maxY);
+  };
+  restore();
+  requestAnimationFrame(restore);
+  setTimeout(restore,60);
+  setTimeout(restore,200);
+  window._viewsVisited.add(v);
+}
+function _saveViewScroll(v){
+  const el=document.getElementById(v+'View');if(!el)return;
+  window._viewScrollMem[v]=el.scrollTop;
+}
+/* loader helpers — show: instant, no fade-in (covers slide). hide: smooth fade-out after settle */
+let _loaderTimer=null;
+function _showLoader(){
+  const el=document.getElementById('viewLoader');if(!el)return;
+  if(_loaderTimer){clearTimeout(_loaderTimer);_loaderTimer=null;}
+  el.classList.remove('fading');
+  el.classList.add('on');
+}
+function _hideLoader(delay){
+  const el=document.getElementById('viewLoader');if(!el)return;
+  if(_loaderTimer){clearTimeout(_loaderTimer);_loaderTimer=null;}
+  _loaderTimer=setTimeout(()=>{
+    el.classList.add('fading');
+    el.classList.remove('on');
+    _loaderTimer=null;
+  },delay||0);
 }
 function switchView(v,dir,skipPrep){
   const prev=getCurrentView();if(v===prev)return;
+  try{if(prev)_saveViewScroll(prev);}catch(e){}
   if(prev==='timer'&&typeof _visionRelock==='function')_visionRelock();
+  // show loader during transition — hides any DOM rebuild / scroll restore flickers
+  if(!skipPrep)_showLoader();
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
   moveTabInd(document.querySelector('.tab.active'));
-  // toggle .hidden BEFORE prepareView so buildStats / chart can measure clientHeight
   document.getElementById('timerView').classList.toggle('hidden',v!=='timer');
   document.getElementById('statsView').classList.toggle('hidden',v!=='stats');
   document.getElementById('habitsView').classList.toggle('hidden',v!=='habits');
   document.body.classList.toggle('view-timer',v==='timer');
-  if(!skipPrep)prepareView(v);
+  try{const _el=document.getElementById(v+'View');if(_el)_el.scrollTop=_viewTargetY(v);}catch(e){}
+  if(!skipPrep){
+    prepareView(v);
+    // hide loader after view fully settles (post DOM mutation + scroll restore)
+    _hideLoader(280);
+  }
 }
 document.querySelectorAll('.tab').forEach(t=>{t.onclick=()=>{
   if(document.documentElement.classList.contains('locked'))return;
@@ -2807,9 +2912,14 @@ document.body.classList.add('view-timer');
     const tIdx=idx+dir;
     if(tIdx<0||tIdx>=VIEW_ORDER.length)return null;
     const name=VIEW_ORDER[tIdx];
+    // save current scroll, pre-set incoming view's scroll BEFORE making it visible
+    try{const _cv=VIEW_ORDER[idx];if(_cv&&typeof _saveViewScroll==='function')_saveViewScroll(_cv);}catch(e){}
     const el=viewById(name);
     el.classList.remove('hidden');
-    // prepareView deferred to AFTER commit — running mid-swipe caused visible re-render flash
+    try{el.scrollTop=_viewTargetY(name);}catch(e){}
+    // build BEFORE slide so user sees populated view from start of animation, not empty → pop
+    try{prepareView(name);}catch(e){}
+    try{el.scrollTop=_viewTargetY(name);}catch(e){}
     el.classList.add('swipe-in');
     applyStageBox(el);
     el.style.zIndex='3';
@@ -2868,6 +2978,7 @@ document.body.classList.add('view-timer');
     pendingTimer=setTimeout(()=>{pendingTimer=null;const f=pendingFinalize;pendingFinalize=null;if(f)f();},580);
   }
   function commit(dir,toName){
+    try{if(typeof _showLoader==='function')_showLoader();}catch(e){}
     if(curView){curView.classList.add('swipe-snap');curView.classList.remove('swipe-drag');
       curView.style.transform='translate3d('+(dir>0?-100:100)+'%,0,0)';
       curView.style.setProperty('--brt','1');}
@@ -2875,11 +2986,10 @@ document.body.classList.add('view-timer');
       nextView.style.transform='translate3d(0,0,0)';}
     const oldCur=curView,oldNext=nextView;nextView=null;
     pendingFinalize=()=>{
-      // switchView first so display state is canonical, THEN clear transient styles, THEN render
       switchView(toName,0,true);
       resetStage(oldCur);resetStage(oldNext);
-      // defer prepareView so its DOM rebuild lands on a fully painted, stable view (no mid-flight flash)
-      requestAnimationFrame(()=>{try{prepareView(toName);}catch(e){}});
+      // hide loader AFTER slide settles + DOM stable
+      try{if(typeof _hideLoader==='function')_hideLoader(180);}catch(e){}
     };
     pendingTimer=setTimeout(()=>{pendingTimer=null;const f=pendingFinalize;pendingFinalize=null;if(f)f();},500);
   }
@@ -2907,6 +3017,9 @@ document.body.classList.add('view-timer');
   window._animateViewTo=function(toName){
     const prev=getCurrentView();if(toName===prev)return false;
     clearPending();
+    try{if(prev&&typeof _saveViewScroll==='function')_saveViewScroll(prev);}catch(e){}
+    try{if(typeof _showLoader==='function')_showLoader();}catch(e){}
+    try{const _te=document.getElementById(toName+'View');if(_te){_te.scrollTop=_viewTargetY(toName);}}catch(e){}
     const idx=VIEW_ORDER.indexOf(prev),tIdx=VIEW_ORDER.indexOf(toName);
     if(idx<0||tIdx<0)return false;
     const dir=tIdx>idx?1:-1;
@@ -2918,7 +3031,10 @@ document.body.classList.add('view-timer');
     curView.classList.add('swipe-out');curView.style.zIndex='1';
     const el=viewById(toName);
     el.classList.remove('hidden');
-    // prepareView deferred to commit finalize — running here caused visible re-render mid-slide
+    try{el.scrollTop=_viewTargetY(toName);}catch(e){}
+    // build BEFORE slide so view is fully populated as it enters viewport
+    try{prepareView(toName);}catch(e){}
+    try{el.scrollTop=_viewTargetY(toName);}catch(e){}
     el.classList.add('swipe-in');
     applyStageBox(el);
     el.style.zIndex='3';
@@ -3351,6 +3467,7 @@ function _visionPick(){document.getElementById('visionFile').click();}
   await openDB();
   try{await loadDay();}catch(e){}
   try{await loadUserGoals();pruneDoneGoals();}catch(e){}
+  try{const t=await kvGet('dailyTarget');window._dailyTarget=(typeof t==='number'&&t>0)?t:120;}catch(e){window._dailyTarget=120;}
   try{globalNotes=(await kvGet('notes'))||'';}catch(e){globalNotes='';}
   try{var vb=await kvGet('visionBoard');if(vb)_visionShow(vb);}catch(e){}
   try{await loadHabits();}catch(e){habits=[];habitLog={};habitAuto={};}
@@ -4334,18 +4451,39 @@ const focusCSS=document.createElement('style');
 focusCSS.textContent=`
 /* ============ STATS PAGE — UNIFIED HIERARCHY ============ */
 #statsView{padding-bottom:calc(96px + env(safe-area-inset-bottom));}
-#statsView>.card,#statsView>.widget-pager{margin:14px 0 0;}
-#statsView>.card:first-child,#statsView>.widget-pager:first-child{margin-top:4px;}
+#statsView .card,#statsView .widget-pager{margin:0 0 14px;}
+#statsView>.card:first-child{margin-top:4px;}
+.stats-sec-wrap>*{margin-bottom:14px;}
+.stats-sec-wrap>*:last-child{margin-bottom:0;}
 /* compact mode for fewer scrolls */
-#statsView>.card{padding:16px;}
+#statsView .card{padding:16px;}
 /* universal touch polish */
-button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-btn{-webkit-tap-highlight-color:transparent;}
+button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-btn,.st-tab{-webkit-tap-highlight-color:transparent;}
 *:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:6px;}
+button:focus:not(:focus-visible){outline:none;}
 /* friendlier empty states */
 .empty,.fa-empty,.gs-empty{font-size:13px;color:var(--text-3);text-align:center;padding:22px 12px;letter-spacing:-.1px;line-height:1.5;}
+
+/* ============ MICRO-ANIMATIONS + HOVER ============ */
+@media (hover:hover) and (pointer:fine){
+  .widget-card.card:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.35);}
+  .stat:hover{transform:translateY(-1px);}
+  .mh-cell:hover{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));}
+  .reset-row:hover{background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.015));}
+  .st-tab:not(.on):hover{color:var(--text-2);background:rgba(255,255,255,.03);}
+  .fc-tabs button:not(.on):hover{background:rgba(255,255,255,.06);color:var(--text-2);}
+  .filt:not(.active):hover{background:rgba(255,255,255,.06);color:var(--text-2);}
+}
+/* unified card transitions */
+.widget-card.card{transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s ease;}
+.stat,.mh-cell,.mh-vs,.reset-row,.st-tab,.fc-tabs button,.filt{transition:transform .15s cubic-bezier(.22,1,.36,1),background .2s ease,color .2s ease,box-shadow .2s ease;}
+/* number tabular everywhere */
+.num,.v,.mc-v,.mh-vsv,.mh-big,.cv,.fc-val,.cell,.ft-v,.sf-pill .v{font-variant-numeric:tabular-nums;}
+/* skeleton shimmer */
+@keyframes skelShim{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
 /* touch tap feedback */
 #statsView>.card,#statsView .mh-cell,#statsView .mh-vs,#statsView .stat{transition:transform .15s cubic-bezier(.22,1,.36,1),box-shadow .2s ease;}
-#statsView>.card:active{transform:scale(.985);}
+/* whole-card active scale removed — only tapped elements respond, not whole card */
 #statsView .mh-cell:active,#statsView .mh-vs:active,#statsView .stat:active{transform:scale(.95);}
 /* aurora glow behind momentum hero */
 .focus-card{position:relative;overflow:hidden;}
@@ -4434,8 +4572,8 @@ button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-
 .focus-card{margin:16px 0 14px!important;padding:18px!important;border-radius:18px!important;}
 .focus-card .c-head{margin-bottom:14px;}
 .mh-hero{padding:6px 2px 4px;}
-.mh-eyebrow{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--text-3);text-transform:uppercase;margin:0 0 18px;text-align:center;}
-.mh-eyebrow b{color:var(--text-2);font-weight:800;}
+.mh-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:1.8px;color:var(--text-3);text-transform:uppercase;margin:0 0 16px;text-align:center;}
+.mh-eyebrow b{background:linear-gradient(180deg,#fff,#a8c8ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:800;}
 .mh-mainline{display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:16px;}
 .mh-big{font-size:64px;font-weight:800;letter-spacing:-3px;line-height:.95;font-variant-numeric:tabular-nums;
   background:linear-gradient(180deg,#7ab8ff,#0a72e8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
@@ -4450,6 +4588,23 @@ button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-
 .mh-vs .mh-vsv.up{color:#5ee577;}
 .mh-vs .mh-vsv.down{color:#ff8a82;}
 .mh-bestbar{margin:8px 0 14px;}
+.mh-side-3{grid-template-columns:repeat(3,1fr)!important;}
+.mh-side-3 .mh-vs{padding:8px 9px;}
+.mh-side-3 .mh-vsv{font-size:13.5px;}
+.mh-vsv.fire{color:#ff8a30;}
+.mh-vsv.warm{color:#ffb340;}
+.mh-targetbar{margin:6px 0 14px;padding:11px 13px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:0.5px solid var(--hair);border-radius:13px;}
+.mh-tb-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;}
+.mh-tb-l{font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;}
+.mh-tb-v{font-size:12.5px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-.2px;}
+.mh-tb-track{height:8px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;position:relative;}
+.mh-tb-fill{height:100%;border-radius:4px;transition:width .9s cubic-bezier(.22,1,.36,1);position:relative;overflow:hidden;}
+.mh-tb-fill.green{background:linear-gradient(90deg,#3ddf6b,#5ee577);box-shadow:0 0 12px rgba(48,209,88,.5);}
+.mh-tb-fill.amber{background:linear-gradient(90deg,#ffb340,#ffd06a);box-shadow:0 0 10px rgba(255,159,10,.4);}
+.mh-tb-fill.red{background:linear-gradient(90deg,#ff5b51,#ff8a82);box-shadow:0 0 10px rgba(255,69,58,.4);}
+.mh-tb-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 40%,rgba(255,255,255,.4) 50%,transparent 60%);transform:translateX(-100%);animation:tbShim 3s ease-in-out infinite;}
+@keyframes tbShim{0%{transform:translateX(-100%);}60%,100%{transform:translateX(200%);}}
+.mh-tb-foot{margin-top:7px;font-size:11px;color:var(--text-2);font-weight:600;letter-spacing:.2px;text-align:center;font-variant-numeric:tabular-nums;}
 .mh-bb-track{height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;}
 .mh-bb-fill{height:100%;background:linear-gradient(90deg,#3ddf6b,#5ee577,#a8f0b8);border-radius:3px;transition:width .8s cubic-bezier(.22,1,.36,1);box-shadow:0 0 8px rgba(48,209,88,.4);}
 .mh-bb-fill.short{background:linear-gradient(90deg,#ff6b60,#ffb340);box-shadow:0 0 8px rgba(255,159,10,.3);}
@@ -4471,6 +4626,28 @@ button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-
 .mh-cell.green .mc-v{color:#5ee577;}
 .mh-section-hdr{font-size:10px;font-weight:800;letter-spacing:1.2px;color:var(--text-3);text-transform:uppercase;margin:14px 0 8px;}
 .stats-sec{font-size:11px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1.4px;margin:22px 4px 8px;}
+/* ============ STATS TABS ============ */
+.stats-tabs{display:flex;gap:6px;padding:5px;margin:14px 0 12px;background:var(--card);border:0.5px solid var(--hair);border-radius:15px;}
+.st-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:11px 8px;background:transparent;border:0;color:var(--text-3);
+  font-family:inherit;font-size:13px;font-weight:700;letter-spacing:-.1px;
+  border-radius:11px;cursor:pointer;transition:background .25s ease,color .25s ease,transform .15s ease;
+  -webkit-tap-highlight-color:transparent;}
+.st-tab svg{width:15px;height:15px;}
+.st-tab:active{transform:scale(.96);}
+.st-tab.on{background:linear-gradient(180deg,#3398ff,#0a78ee);color:#fff;
+  box-shadow:0 6px 18px rgba(10,132,255,.4),inset 0 1px 0 rgba(255,255,255,.18);}
+.stats-sec-wrap{display:none;animation:secIn .42s cubic-bezier(.22,1,.36,1);}
+.stats-sec-wrap.on{display:block;}
+.stats-sec-wrap.on>*{animation:secItemIn .45s cubic-bezier(.22,1,.36,1) backwards;}
+.stats-sec-wrap.on>*:nth-child(1){animation-delay:.05s;}
+.stats-sec-wrap.on>*:nth-child(2){animation-delay:.12s;}
+.stats-sec-wrap.on>*:nth-child(3){animation-delay:.19s;}
+.stats-sec-wrap.on>*:nth-child(4){animation-delay:.26s;}
+@keyframes secIn{from{opacity:0;transform:translateX(14px);}to{opacity:1;transform:translateX(0);}}
+@keyframes secItemIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+#statsSecFocus:not(:has(#faHd)){min-height:80px;}
+#statsSecFocus:empty::before{content:"No focus data yet — finish a session";display:block;text-align:center;padding:30px 16px;color:var(--text-3);font-size:13px;}
 @keyframes facIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 .focus-tile{transition:transform .25s ease,box-shadow .25s ease;}
 .focus-tile:active{transform:scale(.98);}
@@ -4594,6 +4771,8 @@ button,a,.tab,.reset-row,.gs-btn,.fa-tog,.fc-tabs button,.sm-acts button,.modal-
 .fc-bar.empty{background:rgba(255,255,255,.06);}
 .fc-lbl{font-size:9.5px;color:var(--text-3);font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
 .fc-val{font-size:9.5px;color:var(--text-2);font-weight:700;font-variant-numeric:tabular-nums;}
+.fa-shown{margin-top:8px;}
+.fa-count{font-size:11px;font-weight:800;color:var(--text-2);background:rgba(255,255,255,.06);border:0.5px solid var(--hair);padding:3px 10px;border-radius:9px;font-variant-numeric:tabular-nums;letter-spacing:.3px;}
 .fa-collapse{overflow:hidden;max-height:0;opacity:0;
   transition:max-height .45s cubic-bezier(.22,1,.36,1),opacity .3s ease,margin .35s ease;
   margin-top:0;}
@@ -4690,11 +4869,18 @@ function buildFocusCard(){
   let html='<div class="c-head"><div class="c-title">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'+
     'Momentum</div></div>';
-  // yesterday + record-gap for motivational competitive layer
+  // yesterday + record-gap + streak + target for motivational layer
   const yd=new Date();yd.setDate(yd.getDate()-1);const yKey=keyOf(yd);const yP=dayPoints(yKey);
   const vsYDelta=(dP!=null&&yP!=null)?(dP-yP):null;
   const vsBestDelta=(dP!=null&&bestPts>0)?(dP-bestPts):null;
   const bestRatio=(dP!=null&&dP>0&&bestPts>0)?Math.min(1,dP/bestPts):0;
+  // focus streak (consecutive days w/ ≥30 min focused) — don't break the chain
+  let streak=0;{const _d=new Date();_d.setHours(0,0,0,0);for(let i=0;i<3650;i++){const k=keyOf(_d);if(dayFocusedMin(k)<30)break;streak++;_d.setDate(_d.getDate()-1);}}
+  // daily target progress
+  const dailyTarget=(typeof window._dailyTarget==='number'&&window._dailyTarget>0)?window._dailyTarget:120;
+  const targetRatio=Math.min(1.5,todayMin/dailyTarget);
+  const targetPct=Math.round(Math.min(1,targetRatio)*100);
+  const targetHit=todayMin>=dailyTarget;
   let msg='',msgCls='neutral';
   if(dP==null||dP===0){msg='No momentum yet — start a session.';msgCls='behind';}
   else if(vsBestDelta!=null&&vsBestDelta>=0&&dP===bestPts){msg='🏆 Tied with your record. Push higher.';msgCls='record';}
@@ -4706,18 +4892,23 @@ function buildFocusCard(){
   const bestPct=Math.round(bestRatio*100);
   const bbCls=bestPct>=80?'':(bestPct>=40?'medium':'short');
   const gapTxt=(vsBestDelta!=null&&vsBestDelta<0)?('need +'+(-vsBestDelta)+' to beat best'):(vsBestDelta!=null&&vsBestDelta>=0?'new high!':'no record yet');
+  const streakCls=streak>=7?'fire':(streak>=3?'warm':'');
+  const tCls=targetHit?'green':(targetRatio>=0.5?'amber':'red');
   html+='<div class="mh-hero">'+
     '<div class="mh-eyebrow"><b>Time</b> × <b>Focus quality</b> = today\'s score</div>'+
     '<div class="mh-mainline">'+
       '<div class="mh-big '+dCol+'">'+dispVal+'</div>'+
-      '<div class="mh-side">'+
+      '<div class="mh-side mh-side-3">'+
         '<div class="mh-vs"><span class="mh-vsl">vs yesterday</span><span class="mh-vsv '+(vsYDelta>0?'up':(vsYDelta<0?'down':''))+'">'+(vsYDelta==null?'—':(vsYDelta>=0?'↑+'+vsYDelta:'↓'+vsYDelta))+'</span></div>'+
+        '<div class="mh-vs"><span class="mh-vsl">🔥 streak</span><span class="mh-vsv '+streakCls+'">'+(streak>0?streak+(streak===1?' day':' days'):'—')+'</span></div>'+
         '<div class="mh-vs"><span class="mh-vsl">🏆 best</span><span class="mh-vsv">'+(bestPts?('+'+bestPts):'—')+'</span></div>'+
       '</div>'+
     '</div>'+
-    '<div class="mh-bestbar">'+
-      '<div class="mh-bb-track"><div class="mh-bb-fill '+bbCls+'" style="width:'+bestPct+'%"></div></div>'+
-      '<div class="mh-bb-label">'+bestPct+'% of personal best · '+gapTxt+'</div>'+
+    // daily target progress (commitment device)
+    '<div class="mh-targetbar" data-target="'+dailyTarget+'">'+
+      '<div class="mh-tb-head"><span class="mh-tb-l">Daily target</span><span class="mh-tb-v">'+fmtDur(Math.round(todayMin))+' / '+fmtDur(dailyTarget)+'</span></div>'+
+      '<div class="mh-tb-track"><div class="mh-tb-fill '+tCls+'" style="width:'+targetPct+'%"></div></div>'+
+      '<div class="mh-tb-foot">'+(targetHit?'✓ Target hit — push past it':(targetPct+'% complete · '+fmtDur(Math.max(0,Math.round(dailyTarget-todayMin)))+' to go'))+'</div>'+
     '</div>'+
     '<div class="mh-msg '+msgCls+'">'+msg+'</div>'+
     '<div class="mh-cells">'+
@@ -4750,23 +4941,27 @@ function buildFocusCard(){
   buildFocusInfoCard();
   // shimmer sweep on (re)build
   card.classList.remove('fc-shimmer');void card.offsetWidth;card.classList.add('fc-shimmer');
-  // big-number count-up
+  // big-number count-up — only on value change (not on every re-render)
   const bigEl=card.querySelector('.mh-big');
   if(bigEl && dP!=null){
-    const target=dP;const startT=performance.now();const dur=900;const sign=target>=0?'+':'';
-    function tick(t){
-      const k=Math.min(1,(t-startT)/dur);
-      const eased=1-Math.pow(1-k,3);
-      const cur=Math.round(target*eased);
-      bigEl.textContent=(cur>=0?'+':'')+cur;
-      if(k<1)requestAnimationFrame(tick);else bigEl.textContent=sign+target;
+    const target=dP;
+    if(window._lastMhBigVal!==target){
+      window._lastMhBigVal=target;
+      const startT=performance.now();const dur=900;const sign=target>=0?'+':'';
+      function tick(t){
+        const k=Math.min(1,(t-startT)/dur);
+        const eased=1-Math.pow(1-k,3);
+        const cur=Math.round(target*eased);
+        bigEl.textContent=(cur>=0?'+':'')+cur;
+        if(k<1)requestAnimationFrame(tick);else bigEl.textContent=sign+target;
+      }
+      requestAnimationFrame(tick);
     }
-    requestAnimationFrame(tick);
   }
 }
+let _statsTab='time';
 function _organizeStatsView(){
   const sv=document.getElementById('statsView');if(!sv)return;
-  // remove old section labels (cards have their own titles — no need for outside labels)
   sv.querySelectorAll('.stats-sec').forEach(n=>n.remove());
   const focusCard=document.getElementById('focusAnalysis');
   const pager=sv.querySelector('.widget-pager');
@@ -4776,14 +4971,56 @@ function _organizeStatsView(){
   const heatCard=heatEl?heatEl.closest('.card'):null;
   const histEl=document.getElementById('history');
   const histCard=histEl?histEl.closest('.card'):null;
-  const order=[focusCard,pager,chartCard,heatCard,histCard].filter(Boolean);
-  // only reorder if order is wrong (don't touch DOM unnecessarily)
-  const want=order.map(e=>e);
-  const got=Array.from(sv.children);
-  let ok=got.length===want.length;
-  if(ok)for(let i=0;i<want.length;i++){if(got[i]!==want[i]){ok=false;break;}}
-  if(ok)return;
-  order.forEach(el=>{sv.appendChild(el);el.style.display='';});
+  if(sv.dataset.tabsBuilt!=='1'){
+    // build tab strip + section wrappers once
+    let tabStrip=document.getElementById('statsTabs');
+    if(!tabStrip){
+      tabStrip=document.createElement('div');tabStrip.className='stats-tabs';tabStrip.id='statsTabs';
+      tabStrip.innerHTML='<button class="st-tab" data-sec="time"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Time</button>'+
+        '<button class="st-tab" data-sec="focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Focus</button>'+
+        '<button class="st-tab" data-sec="date"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>History</button>';
+    }
+    let timeSec=document.getElementById('statsSecTime');if(!timeSec){timeSec=document.createElement('div');timeSec.className='stats-sec-wrap';timeSec.id='statsSecTime';}
+    let focusSec=document.getElementById('statsSecFocus');if(!focusSec){focusSec=document.createElement('div');focusSec.className='stats-sec-wrap';focusSec.id='statsSecFocus';}
+    let dateSec=document.getElementById('statsSecDate');if(!dateSec){dateSec=document.createElement('div');dateSec.className='stats-sec-wrap';dateSec.id='statsSecDate';}
+    // re-assemble: focusCard, tabStrip, timeSec(pager+chart+heat), focusSec(filled by renderFaSessions), dateSec(history)
+    if(focusCard)sv.appendChild(focusCard);
+    sv.appendChild(tabStrip);
+    if(pager)timeSec.appendChild(pager);
+    if(chartCard)timeSec.appendChild(chartCard);
+    if(heatCard)timeSec.appendChild(heatCard);
+    sv.appendChild(timeSec);
+    sv.appendChild(focusSec);
+    if(histCard)dateSec.appendChild(histCard);
+    sv.appendChild(dateSec);
+    tabStrip.querySelectorAll('.st-tab').forEach(b=>{
+      b.onclick=()=>{_statsTab=b.dataset.sec;_syncStatsTabs();};
+    });
+    sv.dataset.tabsBuilt='1';
+  }
+  _syncStatsTabs();
+}
+function _syncStatsTabs(){
+  const sv=document.getElementById('statsView');if(!sv)return;
+  const tabStrip=document.getElementById('statsTabs');if(!tabStrip)return;
+  // preserve scroll position across tab swap (don't jump up if content shrinks)
+  const savedScroll=sv.scrollTop;
+  tabStrip.querySelectorAll('.st-tab').forEach(b=>b.classList.toggle('on',b.dataset.sec===_statsTab));
+  ['time','focus','date'].forEach(s=>{
+    const el=document.getElementById('statsSec'+s.charAt(0).toUpperCase()+s.slice(1));
+    if(!el)return;
+    const shouldShow=(s===_statsTab);
+    if(shouldShow){
+      el.classList.remove('on');void el.offsetWidth;el.classList.add('on');
+    } else {
+      el.classList.remove('on');
+    }
+  });
+  // restore — but clamp to actual maxScroll if new section shorter
+  requestAnimationFrame(()=>{
+    const maxY=Math.max(0,sv.scrollHeight-sv.clientHeight);
+    sv.scrollTop=Math.min(savedScroll,maxY);
+  });
 }
 
 const FA_PER_PAGE=5;
@@ -4928,41 +5165,29 @@ function buildFocusInfoCard(){
   };
 }
 function renderFaSessions(todaySess){
-  const card=document.getElementById('focusAnalysis');if(!card)return;
-  // header
+  const host=document.getElementById('statsSecFocus')||document.getElementById('focusAnalysis');
+  if(!host)return;
+  // header — chip count only, no toggle
   let hd=document.getElementById('faHd');
   if(!hd){
     hd=document.createElement('div');hd.id='faHd';hd.className='fa-hd';
-    hd.innerHTML='<span class="fa-ttl">Today\'s sessions</span>'+
-      '<button class="fa-tog" id="faTog"><span id="faTogLbl">Show</span>'+
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
-    card.appendChild(hd);
-    document.getElementById('faTog').onclick=()=>{
-      _faOpen=!_faOpen;
-      const w=document.getElementById('faWrap');
-      const t=document.getElementById('faTog');
-      const lbl=document.getElementById('faTogLbl');
-      if(w)w.classList.toggle('open',_faOpen);
-      if(t)t.classList.toggle('open',_faOpen);
-      if(lbl)lbl.textContent=_faOpen?'Hide':('Show ('+(sessionsForDate(keyOf(new Date())).length)+')');
-    };
-  }
-  const tog=document.getElementById('faTog');
+    hd.innerHTML='<span class="fa-ttl">Today\'s sessions</span><span class="fa-count" id="faTogLbl">0</span>';
+    host.appendChild(hd);
+  } else if(hd.parentNode!==host){host.appendChild(hd);}
   const togLbl=document.getElementById('faTogLbl');
-  tog.classList.toggle('open',_faOpen);
-  togLbl.textContent=_faOpen?'Hide':('Show ('+todaySess.length+')');
-  // collapsible wrapper for list + pager
+  if(togLbl)togLbl.textContent=todaySess.length;
+  // always-visible wrapper
   let wrap=document.getElementById('faWrap');
   if(!wrap){
-    wrap=document.createElement('div');wrap.id='faWrap';wrap.className='fa-collapse';
+    wrap=document.createElement('div');wrap.id='faWrap';wrap.className='fa-shown';
     const fl=document.createElement('div');fl.id='faList';fl.className='fa-list';
     const pg=document.createElement('div');pg.id='faPager';pg.className='fa-pager';
     wrap.appendChild(fl);wrap.appendChild(pg);
-    card.appendChild(wrap);
-  }
+    host.appendChild(wrap);
+  } else if(wrap.parentNode!==host){host.appendChild(wrap);}
   const fl=document.getElementById('faList');
   const pg=document.getElementById('faPager');
-  wrap.classList.toggle('open',_faOpen && !!todaySess.length);
+  /* always visible — no toggle */
   if(!todaySess.length){
     fl.innerHTML='<div class="fa-empty">No sessions yet today</div>';
     pg.innerHTML='';
@@ -5093,6 +5318,7 @@ if(typeof window.openDay==='function'){
     {id:'visionBoard',label:'Vision board',desc:'uploaded image',dated:false},
     {id:'notes',label:'Global notes',desc:'persistent note text',dated:false},
     {id:'userGoals',label:'Goal list',desc:'persistent user-managed goals',dated:false},
+    {id:'dailyTarget',label:'Daily target',desc:'daily focus commitment minutes',dated:false},
   ];
   const _subSel={days:new Set(['elapsed','goals','notes']),habitIds:new Set()};
   async function sizeOf(id){
@@ -5353,6 +5579,8 @@ if(typeof window.openDay==='function'){
       await kvPut('notes','');
     } else if(tid==='userGoals'){
       await kvPut('userGoals',[]);
+    } else if(tid==='dailyTarget'){
+      await kvPut('dailyTarget',120);window._dailyTarget=120;
     }
   }
   /* maintenance handlers */
