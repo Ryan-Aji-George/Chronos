@@ -2025,22 +2025,17 @@ async function buildStats(){
   document.getElementById('sDays').textContent=_realDays.length;
   document.getElementById('sAvg').innerHTML=(_realDays.length?totalMs/3600000/_realDays.length:0).toFixed(1)+'<span class="u">h</span>';
 
-  // bar chart — scrolls horizontally; default position shows last 7 (rightmost = today)
+  // bar chart — strictly last 7 days (today-6 to today)
   const chart=document.getElementById('chart');chart.innerHTML='';
   const _today=new Date();_today.setHours(0,0,0,0);
-  const _keys=Object.keys(map).sort();
-  let _firstD;
-  if(_keys.length){_firstD=new Date(_keys[0]+'T00:00:00');_firstD.setHours(0,0,0,0);}
-  else{_firstD=new Date(_today);_firstD.setDate(_today.getDate()-6);}
-  const _minStart=new Date(_today);_minStart.setDate(_today.getDate()-6);
-  if(_firstD>_minStart)_firstD=_minStart;
+  const _firstD=new Date(_today);_firstD.setDate(_today.getDate()-6);
   const allDays=[];
-  for(let _dd=new Date(_firstD);_dd<=_today;_dd.setDate(_dd.getDate()+1)){
+  for(let i=0;i<7;i++){
+    const _dd=new Date(_firstD);_dd.setDate(_firstD.getDate()+i);
     const _k=keyOf(_dd);
     allDays.push({k:_k,label:['S','M','T','W','T','F','S'][_dd.getDay()],ms:(map[_k]?map[_k].elapsed:0)||0,today:_k===state.date});
   }
-  const _scaleSlice=allDays.slice(-7);
-  let mx=Math.max.apply(null,_scaleSlice.map(x=>x.ms));
+  let mx=Math.max.apply(null,allDays.map(x=>x.ms));
   if(!mx||!isFinite(mx))mx=1;
   // size each col so exactly 7 fit per viewport; surplus days extend left for scroll
   const _gap=8,_pad=8;
