@@ -2051,15 +2051,11 @@ async function buildStats(){
     col.innerHTML='<div class="cv">'+(hrs>=0.05?hrs.toFixed(1):'')+'</div><div class="bw"><div class="bar'+(x.today?' tdy':'')+'"></div></div><div class="cl">'+x.label+'</div>';
     col.title=x.k;col.onclick=()=>openDay(x.k);chart.appendChild(col);
     const bar=col.querySelector('.bar');
-    const _setH=(tries)=>{
-      const bw=bar.parentElement;
-      const bwH=bw?bw.clientHeight:0;
-      if(bwH<=0&&tries<40){requestAnimationFrame(()=>_setH(tries+1));return;}
-      const effH=bwH>0?bwH:80;
-      const ratio=mx>0?x.ms/mx:0;
-      bar.style.height=Math.max(6,Math.round(ratio*effH))+'px';
-    };
-    requestAnimationFrame(()=>_setH(0));
+    // .bw computed height inside .chart (170px) minus chrome ~ 83px. Hardcoded to avoid clientHeight=0 race
+    const BW_PX=83;
+    const ratio=mx>0?x.ms/mx:0;
+    bar.style.height='0px';
+    requestAnimationFrame(()=>{bar.style.height=Math.max(6,Math.round(ratio*BW_PX))+'px';});
   });
   // scroll to rightmost (today) by default — retry across paints in case card not laid out yet
   function _scrollEnd(){try{chart.scrollLeft=chart.scrollWidth;}catch(e){}}
