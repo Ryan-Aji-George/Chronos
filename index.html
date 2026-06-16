@@ -1731,11 +1731,13 @@ document.getElementById('factoryResetBtn').onclick=async()=>{
   state.date=todayKey();state.elapsed=0;state.running=false;state.startTs=0;state.goals=[];
   globalNotes='';
   habits=[];habitLog={};habitAuto={};_hPage=0;_hQuery='';_hFilter='all';
+  if(typeof userGoals!=='undefined')userGoals=[];
   const hs=document.getElementById('habitSearch');if(hs)hs.value='';
   const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
   try{localStorage.removeItem('chronos_inst');}catch(e){}
-  await loadDay();await kvPut('notes','');await kvPut('habitAuto',{});
+  await loadDay();await kvPut('notes','');await kvPut('habitAuto',{});await kvPut('userGoals',[]);
   try{_visionShow(null);}catch(e){}
+  try{if(typeof _sessInit==='function')await _sessInit();}catch(e){}
   syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();toast('Everything reset');
 };
 
@@ -1745,14 +1747,16 @@ async function buildBackup(){
   const days=await dbAll();
   const dayMap={};days.forEach(d=>dayMap[d.date]=d);
   dayMap[state.date]={date:state.date,elapsed:currentMs(),goals:state.goals};
-  let visionBoard=null,sessions=null,activeSession=null;
+  let visionBoard=null,sessions=null,activeSession=null,userGoalsKv=null,passcode=null;
   try{visionBoard=await kvGet('visionBoard');}catch(e){}
   try{sessions=await kvGet('sessions');}catch(e){}
   try{activeSession=await kvGet('activeSession');}catch(e){}
+  try{userGoalsKv=await kvGet('userGoals');}catch(e){}
+  try{passcode=await kvGet('passcode');}catch(e){}
   return {
     app:'Chronos',
     type:'chronos-backup',
-    version:3,
+    version:4,
     exportedAt:new Date().toISOString(),
     days:Object.values(dayMap),
     notes:globalNotes,
@@ -1761,7 +1765,9 @@ async function buildBackup(){
     habitAuto:habitAuto,
     visionBoard:visionBoard||null,
     sessions:Array.isArray(sessions)?sessions:[],
-    activeSession:activeSession||null
+    activeSession:activeSession||null,
+    userGoals:Array.isArray(userGoalsKv)?userGoalsKv:[],
+    passcode:typeof passcode==='string'?passcode:null
   };
 }
 document.getElementById('exportBtn').onclick=async()=>{
@@ -1798,8 +1804,12 @@ document.getElementById('importFile').onchange=async(ev)=>{
     await kvPut('visionBoard',(typeof parsed.visionBoard==='string'&&parsed.visionBoard)?parsed.visionBoard:null);
     await kvPut('sessions',Array.isArray(parsed.sessions)?parsed.sessions:[]);
     await kvPut('activeSession',parsed.activeSession||null);
+    await kvPut('userGoals',Array.isArray(parsed.userGoals)?parsed.userGoals:[]);
+    if(typeof parsed.passcode==='string'&&/^\d{6}$/.test(parsed.passcode))await kvPut('passcode',parsed.passcode);
     // refresh in-memory state
     await loadDay();
+    try{await loadUserGoals();pruneDoneGoals();}catch(e){}
+    try{if(typeof _sessInit==='function')await _sessInit();}catch(e){}
     globalNotes=(await kvGet('notes'))||'';
     habits=(await kvGet('habits'))||[];
     habitLog=(await kvGet('habitLog'))||{};
@@ -2001,8 +2011,9 @@ notesEl.addEventListener('input',()=>{globalNotes=notesEl.value;autoGrowNotes();
 
 /* ---------- stats: live top boxes (cheap, called every frame while open) ---------- */
 function liveStats(){const f=fmt(currentMs());document.getElementById('sToday').textContent=f.hms2;
-  const done=state.goals.filter(g=>g.done).length;
-  document.getElementById('sTodayGoals').textContent=state.goals.length;
+  const src=(typeof userGoals!=='undefined'&&Array.isArray(userGoals))?userGoals:state.goals;
+  const done=src.filter(g=>g.done).length;
+  document.getElementById('sTodayGoals').textContent=src.length;
   document.getElementById('sTodayGoalsSub').textContent=done+' done';}
 
 /* ---------- stats: full build (DB read) ---------- */
@@ -2015,6 +2026,17 @@ function buildSevenDayChart(map){
   let sessHist=[];try{sessHist=(window._chronosSession&&window._chronosSession.hist&&window._chronosSession.hist())||[];}catch(e){}
   const focusedMsByDay={};
   sessHist.forEach(r=>{if(!r||!r.date)return;focusedMsByDay[r.date]=(focusedMsByDay[r.date]||0)+(r.focusedMin||0)*60000;});
+  // include live active session's focused time toward today
+  try{
+    const liveSess=window._chronosSession&&window._chronosSession.get&&window._chronosSession.get();
+    if(liveSess&&liveSess.startMs){
+      const now=Date.now();
+      const frozen=liveSess.stopPendingAt?(now-liveSess.stopPendingAt):0;
+      const liveMs=Math.max(0,(now-liveSess.startMs)-(liveSess.pausedTotal||0)-frozen);
+      const tk=keyOf(today);
+      focusedMsByDay[tk]=(focusedMsByDay[tk]||0)+liveMs;
+    }
+  }catch(e){}
   // build day list — from earliest known date (sessions or map) up to today
   const keySet=new Set();
   Object.keys(map||{}).forEach(k=>{if(/^\d{4}-\d{2}-\d{2}$/.test(k))keySet.add(k);});
@@ -2092,19 +2114,30 @@ async function buildStats(){
   /* ===== 7-DAYS CHART — rebuilt clean ===== */
   buildSevenDayChart(map);
 
-  // heatmap: last 16 weeks (112 days), column = week
+  // heatmap: last 16 weeks (112 days), uses session-focused min like 7-days chart for consistency
   const heat=document.getElementById('heat');heat.innerHTML='';
   const today=new Date();today.setHours(0,0,0,0);
-  // align so columns are full weeks ending today; start from Sunday
   const totalDays=112;const start=new Date(today);start.setDate(start.getDate()-(totalDays-1));
-  // pad to start on Sunday
   const pad=start.getDay();for(let p=0;p<pad;p++){const c=document.createElement('div');c.className='cell';c.style.visibility='hidden';heat.appendChild(c);}
-  let maxH=0;Object.values(map).forEach(d=>{maxH=Math.max(maxH,(d.elapsed||0)/3600000);});maxH=Math.max(maxH,1);
+  // build focused-ms per day from sessions
+  const _heatFocused={};
+  try{
+    const _h=(window._chronosSession&&window._chronosSession.hist&&window._chronosSession.hist())||[];
+    _h.forEach(r=>{if(r&&r.date)_heatFocused[r.date]=(_heatFocused[r.date]||0)+(r.focusedMin||0)*60000;});
+    const _live=window._chronosSession&&window._chronosSession.get&&window._chronosSession.get();
+    if(_live&&_live.startMs){
+      const now=Date.now();const frozen=_live.stopPendingAt?(now-_live.stopPendingAt):0;
+      const liveMs=Math.max(0,(now-_live.startMs)-(_live.pausedTotal||0)-frozen);
+      const tk=keyOf(today);_heatFocused[tk]=(_heatFocused[tk]||0)+liveMs;
+    }
+  }catch(e){}
+  let maxH=0;Object.keys(_heatFocused).forEach(k=>{maxH=Math.max(maxH,_heatFocused[k]/3600000);});maxH=Math.max(maxH,1);
   for(let i=0;i<totalDays;i++){const d=new Date(start);d.setDate(d.getDate()+i);const k=keyOf(d);
-    const hrs=(map[k]?map[k].elapsed:0)/3600000;const cell=document.createElement('div');cell.className='cell';
-    let bg='rgba(255,255,255,0.05)';if(hrs>0){const r=hrs/maxH;bg=r<.25?'rgba(10,132,255,.3)':r<.5?'rgba(10,132,255,.55)':r<.75?'rgba(10,132,255,.8)':'#0a84ff';}
+    const ms=_heatFocused[k]||0;const hrs=ms/3600000;
+    const cell=document.createElement('div');cell.className='cell';
+    let bg='rgba(255,255,255,0.05)';if(ms>=60000){const r=hrs/maxH;bg=r<.25?'rgba(10,132,255,.3)':r<.5?'rgba(10,132,255,.55)':r<.75?'rgba(10,132,255,.8)':'#0a84ff';}
     cell.style.background=bg;if(k===state.date)cell.style.boxShadow='inset 0 0 0 1.5px #fff,0 0 0 1px rgba(255,255,255,.35)';
-    cell.title=k+' · '+hrs.toFixed(1)+'h';cell.onclick=()=>openDay(k);heat.appendChild(cell);}
+    cell.title=k+' · '+(ms>=60000?hrs.toFixed(2)+'h':'no time');cell.onclick=()=>openDay(k);heat.appendChild(cell);}
 
   // every-day list with search, filter, pagination
   _histDays=arr;
@@ -3915,19 +3948,6 @@ function checkOverflow(){
   }
 }
 
-function _pushTodayGoal(g){
-  if(g.todayGoalId)return;
-  const id=Date.now()+'-'+Math.random().toString(36).slice(2,8);
-  g.todayGoalId=id;
-  state.goals.push({id,text:g.text,done:true});
-  save();renderGoals();
-}
-function _removeTodayGoal(g){
-  if(!g.todayGoalId)return;
-  state.goals=state.goals.filter(x=>x.id!==g.todayGoalId);
-  g.todayGoalId=null;
-  save();renderGoals();
-}
 
 async function toggleGoal(i){
   if(!sess)return;
@@ -4605,7 +4625,17 @@ function dayPoints(k){
   pts += hp;
   return any?pts:null;
 }
-function dayFocusedMin(k){return sessionsForDate(k).reduce((s,r)=>s+(r.focusedMin||0),0);}
+function dayFocusedMin(k){
+  let m=sessionsForDate(k).reduce((s,r)=>s+(r.focusedMin||0),0);
+  // include live active session's focused minutes toward today
+  if(sess&&k===todayKey()){
+    const now=Date.now();
+    const frozen=sess.stopPendingAt?(now-sess.stopPendingAt):0;
+    const liveMs=Math.max(0,(now-sess.startMs)-(sess.pausedTotal||0)-frozen);
+    m+=liveMs/60000;
+  }
+  return m;
+}
 function dayDistract(k){return sessionsForDate(k).reduce((s,r)=>s+(r.distractions||0),0);}
 function weekPoints(){
   const today=new Date();today.setHours(0,0,0,0);
@@ -4647,7 +4677,7 @@ function buildFocusCard(){
   const wP=weekPoints();
   const dDis=dayDistract(today);
   const todaySess=sessionsForDate(today);
-  const todayMin=todaySess.reduce((s,r)=>s+(r.focusedMin||0),0);
+  const todayMin=dayFocusedMin(today); // includes live active session
   const dHab=habitsDoneCount(today);
   const hTotal=(typeof habits!=='undefined'?habits.length:0);
   const wMin=weekFocusedMin();
@@ -5014,7 +5044,7 @@ if(typeof window.openDay==='function'){
       const rs=sessionsForDate(key);
       const dp=dayPoints(key);
       const dis=dayDistract(key);
-      const totMin=rs.reduce((s,r)=>s+(r.focusedMin||0),0);
+      const totMin=dayFocusedMin(key); // includes live active session if today
       const hc=habitsDoneCount(key);
       const hTotal=(typeof habits!=='undefined'?habits.length:0);
       const hp=habitPointsFor(key);
@@ -5062,6 +5092,7 @@ if(typeof window.openDay==='function'){
     {id:'habitAuto',label:'Habit auto state',desc:'auto-tracking state',dated:false},
     {id:'visionBoard',label:'Vision board',desc:'uploaded image',dated:false},
     {id:'notes',label:'Global notes',desc:'persistent note text',dated:false},
+    {id:'userGoals',label:'Goal list',desc:'persistent user-managed goals',dated:false},
   ];
   const _subSel={days:new Set(['elapsed','goals','notes']),habitIds:new Set()};
   async function sizeOf(id){
@@ -5320,6 +5351,8 @@ if(typeof window.openDay==='function'){
       await kvPut('visionBoard',null);
     } else if(tid==='notes'){
       await kvPut('notes','');
+    } else if(tid==='userGoals'){
+      await kvPut('userGoals',[]);
     }
   }
   /* maintenance handlers */
@@ -5408,6 +5441,7 @@ if(typeof window.openDay==='function'){
     try{habits=(await kvGet('habits'))||[];}catch(e){}
     try{habitLog=(await kvGet('habitLog'))||{};}catch(e){}
     try{habitAuto=(await kvGet('habitAuto'))||{};}catch(e){}
+    try{if(typeof loadUserGoals==='function'){await loadUserGoals();pruneDoneGoals();}}catch(e){}
     try{const vb=await kvGet('visionBoard');if(typeof _visionShow==='function')_visionShow(vb||null);}catch(e){}
     try{if(typeof _sessInit==='function')await _sessInit();}catch(e){}
     try{syncUI();}catch(e){}
