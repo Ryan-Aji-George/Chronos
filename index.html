@@ -260,22 +260,8 @@ body{
   box-shadow:inset 0 0.5px 0 rgba(255,255,255,0.06),0 4px 24px rgba(0,0,0,.2);
   transition:border-color .2s;}
 .card:hover{border-color:var(--hair-strong);}
-/* clean staggered entrance when a view becomes active */
-.view:not(.hidden) .timer-hero,.view:not(.hidden) .card,
-.view:not(.hidden) .stat-grid,.view:not(.hidden) .s-hd{
-  animation:rise .5s var(--ease) both;}
-.view:not(.hidden) .timer-hero{animation-delay:.02s;}
-.view:not(.hidden) .s-hd{animation-delay:.02s;}
-.view:not(.hidden) .stat-grid{animation-delay:.06s;}
-.view:not(.hidden) .card:nth-of-type(1){animation-delay:.06s;}
-.view:not(.hidden) .card:nth-of-type(2){animation-delay:.12s;}
-.view:not(.hidden) .card:nth-of-type(3){animation-delay:.18s;}
-.view:not(.hidden) .card:nth-of-type(4){animation-delay:.24s;}
-.view:not(.hidden) .card:nth-of-type(5){animation-delay:.30s;}
+/* rise animation removed — was re-firing on every view re-entry causing pop-back flash after swipe */
 @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
-@media (prefers-reduced-motion:reduce){
-  .view:not(.hidden) .timer-hero,.view:not(.hidden) .card,
-  .view:not(.hidden) .stat-grid,.view:not(.hidden) .s-hd{animation:none;}}
 .c-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px;gap:10px;}
 .c-title{font-size:17px;font-weight:700;letter-spacing:-0.45px;display:flex;align-items:center;gap:10px;}
 .c-title svg{width:18px;height:18px;color:var(--teal);
@@ -2057,9 +2043,9 @@ async function buildStats(){
     col.innerHTML='<div class="cv">'+(hrs>=0.05?hrs.toFixed(1):'')+'</div><div class="bw"><div class="bar'+(x.today?' tdy':'')+'"></div></div><div class="cl">'+x.label+'</div>';
     col.title=x.k;col.onclick=()=>openDay(x.k);chart.appendChild(col);
     const bar=col.querySelector('.bar');
-    // .bw computed height inside .chart (170px) minus chrome ~ 83px. Hardcoded to avoid clientHeight=0 race
     const BW_PX=83;
-    const ratio=mx>0?x.ms/mx:0;
+    let ratio=mx>0?x.ms/mx:0;
+    if(ratio>1)ratio=1; // clamp older off-screen days from overflowing past max
     bar.style.height='0px';
     requestAnimationFrame(()=>{bar.style.height=Math.max(6,Math.round(ratio*BW_PX))+'px';});
   });
@@ -2816,7 +2802,13 @@ document.body.classList.add('view-timer');
     if(nextView){nextView.classList.add('swipe-snap','committed');nextView.classList.remove('swipe-drag');
       nextView.style.transform='translate3d(0,0,0)';}
     const oldCur=curView,oldNext=nextView;nextView=null;
-    pendingFinalize=()=>{resetStage(oldCur);resetStage(oldNext);switchView(toName,0,true);try{prepareView(toName);}catch(e){}};
+    pendingFinalize=()=>{
+      // switchView first so display state is canonical, THEN clear transient styles, THEN render
+      switchView(toName,0,true);
+      resetStage(oldCur);resetStage(oldNext);
+      // defer prepareView so its DOM rebuild lands on a fully painted, stable view (no mid-flight flash)
+      requestAnimationFrame(()=>{try{prepareView(toName);}catch(e){}});
+    };
     pendingTimer=setTimeout(()=>{pendingTimer=null;const f=pendingFinalize;pendingFinalize=null;if(f)f();},500);
   }
   function onEnd(){
