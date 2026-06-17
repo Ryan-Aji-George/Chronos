@@ -4772,7 +4772,7 @@ button:focus:not(:focus-visible){outline:none;}
   border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.02);margin-bottom:10px;}
 .fc-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0;height:100%;}
 .fc-bar-wrap{flex:1;width:100%;max-width:30px;display:flex;align-items:flex-end;justify-content:center;}
-.fc-bar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#3a98ff,#0a72e8);transition:height .6s cubic-bezier(.22,1,.36,1);min-height:2px;}
+.fc-bar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#3a98ff,#0a72e8);transition:height .6s cubic-bezier(.22,1,.36,1);}
 .fc-bar.green{background:linear-gradient(180deg,#3ddf6b,#1fb84a);}
 .fc-bar.amber{background:linear-gradient(180deg,#ffb340,#d6852a);}
 .fc-bar.red{background:linear-gradient(180deg,#ff6b60,#d6352b);}
@@ -5132,19 +5132,29 @@ function populateFcChart(){
     const bar=col.querySelector('.fc-bar');
     const val=col.querySelector('.fc-val');
     const lblEl=col.querySelector('.fc-lbl');
-    const color=b.pts==null?'empty':(b.pts<0?'red':periodBucket(b.pts));
+    const hasData=b.pts!=null && b.pts!==0;
+    const color=!hasData?'empty':(b.pts<0?'red':periodBucket(b.pts));
     bar.className='fc-bar '+color;
-    const pct=b.pts==null?3:Math.max(4,Math.abs(b.pts)/maxAbs*100);
-    const nextH=pct+'%';
-    if(bar.style.height!==nextH){
-      if(needRebuild){bar.style.height='0%';setTimeout(()=>{bar.style.height=nextH;},60+i*35);}
-      else bar.style.height=nextH;
+    // empty/null/zero → hide bar entirely (no placeholder stub)
+    if(!hasData){bar.style.height='0px';bar.style.visibility='hidden';}
+    else{
+      bar.style.visibility='';
+      const pct=Math.max(4,Math.abs(b.pts)/maxAbs*100);
+      const nextH=pct+'%';
+      if(bar.style.height!==nextH){
+        if(needRebuild){bar.style.height='0%';setTimeout(()=>{bar.style.height=nextH;},60+i*35);}
+        else bar.style.height=nextH;
+      }
     }
     const newVal=b.pts==null?'—':((b.pts>=0?'+':'')+b.pts);
     if(val.textContent!==newVal)val.textContent=newVal;
-    // tap → popup
-    col.style.cursor='pointer';col.style.webkitTapHighlightColor='transparent';
-    col.onclick=()=>_showFcTip(b,color);
+    // tap → popup (only when data exists)
+    if(hasData){
+      col.style.cursor='pointer';col.style.webkitTapHighlightColor='transparent';
+      col.onclick=()=>_showFcTip(b,color);
+    } else {
+      col.style.cursor='default';col.onclick=null;
+    }
     if(lblEl.textContent!==b.lbl)lblEl.textContent=b.lbl;
   });
 }
