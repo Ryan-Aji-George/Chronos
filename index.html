@@ -95,7 +95,7 @@ body{
   text-transform:uppercase;line-height:1;
   font-variant-numeric:tabular-nums;}
 
-.view{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px 16px 116px;background:var(--bg);
+.view{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:6px 16px 140px;background:var(--bg);
   will-change:transform,opacity;transform:translate3d(0,0,0);}
 .view::-webkit-scrollbar{width:0;}
 .hidden{display:none!important;}
@@ -1586,6 +1586,14 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
 <!-- view-transition loader -->
 <div id="viewLoader" aria-hidden="true">
   <div class="vl-spin"></div>
+</div>
+
+<!-- momentum bar tap tooltip -->
+<div id="fcTipBg"></div>
+<div id="fcTip" role="dialog" aria-modal="true">
+  <div class="ft-lbl" id="fcTipLbl">—</div>
+  <div class="ft-val" id="fcTipVal">—</div>
+  <div class="ft-sub" id="fcTipSub">—</div>
 </div>
 
 <!-- in-app modal (confirm + prompt) -->
@@ -4450,7 +4458,7 @@ window._chronosSession={get:()=>sess,hist:()=>hist,end:finishSession};
 const focusCSS=document.createElement('style');
 focusCSS.textContent=`
 /* ============ STATS PAGE — UNIFIED HIERARCHY ============ */
-#statsView{padding-bottom:calc(96px + env(safe-area-inset-bottom));}
+#statsView{padding-bottom:calc(140px + env(safe-area-inset-bottom));}
 #statsView .card,#statsView .widget-pager{margin:0 0 14px;}
 #statsView>.card:first-child{margin-top:4px;}
 .stats-sec-wrap>*{margin-bottom:14px;}
@@ -4700,8 +4708,8 @@ button:focus:not(:focus-visible){outline:none;}
 #statsView.sv-anim .col:nth-child(6){animation-delay:.35s;}
 #statsView.sv-anim .col:nth-child(7){animation-delay:.39s;}
 @keyframes colIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-.col.is-today .bar{box-shadow:0 0 14px rgba(10,132,255,.6);animation:colPulse 2.4s ease-in-out infinite;}
-@keyframes colPulse{0%,100%{box-shadow:0 0 12px rgba(10,132,255,.45);}50%{box-shadow:0 0 20px rgba(10,132,255,.75);}}
+.col.is-today .bar{box-shadow:0 0 14px rgba(48,209,88,.6);animation:colPulse 2.4s ease-in-out infinite;}
+@keyframes colPulse{0%,100%{box-shadow:0 0 12px rgba(48,209,88,.45);}50%{box-shadow:0 0 22px rgba(48,209,88,.75);}}
 #statsView.sv-anim .cell{animation:cellIn .35s cubic-bezier(.22,1,.36,1) backwards;}
 @keyframes cellIn{from{opacity:0;transform:scale(.5);}to{opacity:1;transform:scale(1);}}
 .cell{transition:transform .15s ease,box-shadow .25s ease;}
@@ -4770,7 +4778,26 @@ button:focus:not(:focus-visible){outline:none;}
 .fc-bar.red{background:linear-gradient(180deg,#ff6b60,#d6352b);}
 .fc-bar.empty{background:rgba(255,255,255,.06);}
 .fc-lbl{font-size:9.5px;color:var(--text-3);font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
-.fc-val{font-size:9.5px;color:var(--text-2);font-weight:700;font-variant-numeric:tabular-nums;}
+.fc-val{font-size:9.5px;color:var(--text-2);font-weight:700;font-variant-numeric:tabular-nums;display:none;}
+/* tap popup for momentum bar values */
+#fcTip{position:fixed;left:0;right:0;bottom:-100px;z-index:80;
+  background:linear-gradient(180deg,rgba(38,38,42,.98),rgba(24,24,28,.98));
+  border-top:0.5px solid rgba(255,255,255,.12);border-radius:22px 22px 0 0;
+  padding:18px 22px calc(env(safe-area-inset-bottom) + 22px);
+  box-shadow:0 -10px 30px rgba(0,0,0,.5);
+  transform:translateY(0);opacity:0;pointer-events:none;
+  transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .25s ease,bottom .35s cubic-bezier(.22,1,.36,1);}
+#fcTip.on{bottom:0;opacity:1;pointer-events:auto;}
+#fcTip .ft-lbl{font-size:10.5px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:6px;}
+#fcTip .ft-val{font-size:34px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums;
+  background:linear-gradient(180deg,#7ab8ff,#0a72e8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+#fcTip .ft-val.green{background:linear-gradient(180deg,#5ee577,#1fb84a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+#fcTip .ft-val.amber{background:linear-gradient(180deg,#ffb340,#d6852a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+#fcTip .ft-val.red{background:linear-gradient(180deg,#ff6b60,#d6352b);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+#fcTip .ft-sub{font-size:12px;color:var(--text-3);margin-top:4px;font-weight:600;letter-spacing:.2px;}
+#fcTipBg{position:fixed;inset:0;z-index:79;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  opacity:0;pointer-events:none;transition:opacity .25s ease;}
+#fcTipBg.on{opacity:1;pointer-events:auto;}
 .fa-shown{margin-top:8px;}
 .fa-count{font-size:11px;font-weight:800;color:var(--text-2);background:rgba(255,255,255,.06);border:0.5px solid var(--hair);padding:3px 10px;border-radius:9px;font-variant-numeric:tabular-nums;letter-spacing:.3px;}
 .fa-collapse{overflow:hidden;max-height:0;opacity:0;
@@ -5040,6 +5067,28 @@ function rangeFocusedMin(startDate,endDate){
   return m;
 }
 
+function _showFcTip(b,color){
+  const tip=document.getElementById('fcTip'),bg=document.getElementById('fcTipBg');
+  if(!tip||!bg)return;
+  const lbl=document.getElementById('fcTipLbl');
+  const val=document.getElementById('fcTipVal');
+  const sub=document.getElementById('fcTipSub');
+  if(lbl)lbl.textContent=_fcPeriod==='7d'?'Day':_fcPeriod==='4w'?'Week':'Week';
+  if(val){val.className='ft-val '+(color==='empty'?'':color);val.textContent=b.pts==null?'—':((b.pts>=0?'+':'')+b.pts)+' MOM';}
+  if(sub)sub.textContent=b.lbl+(b.min?' · '+Math.round(b.min)+' min':'');
+  bg.classList.add('on');tip.classList.add('on');
+}
+function _hideFcTip(){
+  const tip=document.getElementById('fcTip'),bg=document.getElementById('fcTipBg');
+  if(tip)tip.classList.remove('on');
+  if(bg)bg.classList.remove('on');
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const bg=document.getElementById('fcTipBg');if(bg)bg.onclick=_hideFcTip;
+  const tip=document.getElementById('fcTip');if(tip)tip.onclick=_hideFcTip;
+});
+// also wire immediately in case DOMContentLoaded already fired
+(function(){const bg=document.getElementById('fcTipBg');if(bg)bg.onclick=_hideFcTip;const tip=document.getElementById('fcTip');if(tip)tip.onclick=_hideFcTip;})();
 function populateFcChart(){
   const fc=document.getElementById('fcChart');if(!fc)return;
   const today0=new Date();today0.setHours(0,0,0,0);
@@ -5093,6 +5142,9 @@ function populateFcChart(){
     }
     const newVal=b.pts==null?'—':((b.pts>=0?'+':'')+b.pts);
     if(val.textContent!==newVal)val.textContent=newVal;
+    // tap → popup
+    col.style.cursor='pointer';col.style.webkitTapHighlightColor='transparent';
+    col.onclick=()=>_showFcTip(b,color);
     if(lblEl.textContent!==b.lbl)lblEl.textContent=b.lbl;
   });
 }
