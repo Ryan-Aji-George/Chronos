@@ -3850,6 +3850,15 @@ css.textContent=`
   padding:15px 16px!important;font-size:15px!important;margin-bottom:0!important;}
 .modal-input:focus{border-color:var(--blue)!important;box-shadow:0 0 0 3.5px var(--blue-dim)!important;}
 .sess-board{margin:8px 0 0;display:none;}
+/* paused — freeze all animations + dim everything */
+.sess-board.paused *,.sess-strip.paused *{animation-play-state:paused!important;}
+.sess-board.paused .sb-list,.sess-board.paused .sb-head{opacity:.55;filter:saturate(.5);transition:opacity .3s,filter .3s;}
+.sess-board.paused .sb-goal.current::before,.sess-board.paused .sb-goal.current::after{opacity:0;}
+.sess-strip.paused .distract-btn{opacity:.4;pointer-events:none;}
+.sess-strip.paused .focus-pill{opacity:.55;filter:saturate(.5);}
+.sess-board.paused .sb-head::after{opacity:0;}
+/* paused badge on header */
+.sess-board.paused .sb-head #sbHeadL::before{content:"⏸ ";color:#ffb340;}
 .sb-list{max-height:138px;overflow-y:auto;padding:6px 6px;}
 .sb-list::-webkit-scrollbar{width:0;}
 .sb-goal{margin-bottom:5px;}
@@ -4249,8 +4258,15 @@ function renderBoard(){
   if(!sess){board.classList.remove('on');metaEl.classList.remove('on');if(stripEl)stripEl.classList.remove('on');return;}
   scheduleGoals();
   board.classList.add('on');
-  if(stripEl)stripEl.classList.add('on');
-  const endTs=sess.startMs+totalPlanMin()*60000;
+  // toggle paused state — freezes CSS animations + dims distract button
+  const isPaused=!!sess.stopPendingAt;
+  board.classList.toggle('paused',isPaused);
+  if(stripEl){stripEl.classList.add('on');stripEl.classList.toggle('paused',isPaused);}
+  // wall-clock helper — focus-min offset + paused time + current freeze shift end forward
+  const _frozen=sess.stopPendingAt?(Date.now()-sess.stopPendingAt):0;
+  const _pauseShift=(sess.pausedTotal||0)+_frozen;
+  const wallTimeMs=(focusMin)=>sess.startMs+focusMin*60000+_pauseShift;
+  const endTs=wallTimeMs(totalPlanMin());
   const headL=(sess.stopPendingAt?'Paused · ':'')+fmtDur(totalPlanMin())+' session';
   const headR='ends '+fmtClock(new Date(endTs));
   if($('sbHeadL').textContent!==headL)$('sbHeadL').textContent=headL;
@@ -4272,7 +4288,6 @@ function renderBoard(){
   }
   if(sess.goals.length){
     const em=elapsedMin();
-    const baseMs=sess.startMs;
     const curIdx=sess.goals.findIndex(x=>x.doneAt==null);
     sess.goals.forEach((g,i)=>{
       const row=list.querySelector('.sb-goal[data-i="'+i+'"]');if(!row)return;
@@ -4293,8 +4308,8 @@ function renderBoard(){
       const chk=row.querySelector('.sbg-check');
       const chkCls='sbg-check'+(isDone?' on':'');
       if(chk.className!==chkCls)chk.className=chkCls;
-      const startClock=fmtClock(new Date(baseMs+(g._start||0)*60000));
-      const endClock=fmtClock(new Date(baseMs+(g._end||0)*60000));
+      const startClock=fmtClock(new Date(wallTimeMs(g._start||0)));
+      const endClock=fmtClock(new Date(wallTimeMs(g._end||0)));
       const tmTxt=startClock+' → '+endClock+' · '+fmtDur(g.planMin||0);
       const tmEl=row.querySelector('.sbg-time');
       if(tmEl.textContent!==tmTxt)tmEl.textContent=tmTxt;
