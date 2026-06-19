@@ -2103,11 +2103,7 @@ async function loadUserGoals(){
   }
   // migrate existing entries lacking subjectId/pinned (older schema)
   userGoals.forEach(g=>{if(!g.subjectId)g.subjectId='default';if(typeof g.pinned!=='boolean')g.pinned=false;});
-  // auto-pin first up-to-3 unpinned undone goals if none pinned yet (preserves old timer-page view)
-  if(!userGoals.some(g=>g.pinned)){
-    let n=0;for(const g of userGoals){if(n>=3)break;if(!g.done){g.pinned=true;n++;}}
-  }
-  if(migrated||true)await saveUserGoals();
+  if(migrated)await saveUserGoals();
   if(!_currentSubjectId)_currentSubjectId=(subjects[0]&&subjects[0].id)||'default';
 }
 async function saveUserGoals(){try{await kvPut('userGoals',userGoals);}catch(e){}}
@@ -2122,10 +2118,10 @@ function _subjectsById(){const m={};subjects.forEach(s=>{m[s.id]=s;});return m;}
 function renderGoals(){
   const ul=document.getElementById('goalList');if(!ul)return;
   ul.innerHTML='';
-  // timer page: only PINNED goals (max 3), undone first, done sink
-  const pinned=userGoals.filter(g=>g.pinned).sort((a,b)=>(a.done?1:0)-(b.done?1:0)).slice(0,3);
+  // timer page: ALL pinned goals (no limit), undone first, done sink
+  const pinned=userGoals.filter(g=>g.pinned).sort((a,b)=>(a.done?1:0)-(b.done?1:0));
   if(!userGoals.length){ul.innerHTML='<div class="empty">No goals yet — open "View all goals" to add</div>';}
-  else if(!pinned.length){ul.innerHTML='<div class="empty">No pinned goals — open "View all goals" and pin up to 3</div>';}
+  else if(!pinned.length){ul.innerHTML='<div class="empty">No pinned goals — open "View all goals" and pin a few</div>';}
   else pinned.forEach(g=>ul.appendChild(goalEl(g,true)));
   document.getElementById('goalChip').textContent=userGoals.length;
   if(!document.getElementById('statsView').classList.contains('hidden'))liveStats();
@@ -2230,7 +2226,7 @@ function renderGoalsSheet(){
       '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7 7.5.7-5.7 5.1 1.8 7.4L12 18l-6.6 4.2 1.8-7.4L1.5 9.7 9 9z"/></svg>':
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7 7.5.7-5.7 5.1 1.8 7.4L12 18l-6.6 4.2 1.8-7.4L1.5 9.7 9 9z"/></svg>';
     pin.onclick=async()=>{
-      if(!g.pinned&&pinnedCount>=3){toast('Max 3 pinned — unpin one first');return;}
+      // unlimited pins
       g.pinned=!g.pinned;await saveUserGoals();renderGoalsSheet();renderGoals();
     };
     const up=document.createElement('button');up.className='gs-btn';up.setAttribute('aria-label','Move up');
@@ -4341,14 +4337,11 @@ function renderMeta(){
 
 function checkOverflow(){
   if(!sess||sess.stopPendingAt)return;
-  // ext now driven by scheduleGoals (dynamic shrink-back). Just toast when ext active.
-  if((sess.extMin||0)>0 && !sess._extToast){
-    sess._extToast=true;
-    toast('Session extended — finish your goals');
-    setTimeout(()=>{if(sess)sess._extToast=false;},25000);
-  } else if((sess.extMin||0)===0 && sess._extToast){
-    sess._extToast=false;
-  }
+  const ext=sess.extMin||0;
+  const prev=sess._lastExt||0;
+  // toast ONLY when extension grows (not on every tick while overdue)
+  if(ext>prev+0.5){toast('Session extended +'+Math.ceil(ext-prev)+'m — pick up the pace');}
+  sess._lastExt=ext;
 }
 
 
@@ -4373,20 +4366,24 @@ async function toggleGoal(i){
     }
   }
   const allDone=sess.goals.length && sess.goals.every(x=>x.doneAt!=null);
-  const em=elapsedMin();
-  if(allDone && em<totalPlanMin()-2 && !sess._addMoreShown){
+  if(allDone && !sess._addMoreShown){
     sess._addMoreShown=true;
     setTimeout(()=>{if(sess && sess.goals.every(x=>x.doneAt!=null))promptAddMore();},400);
   }
 }
 
 async function promptAddMore(){
-  const left=Math.max(0,Math.round(totalPlanMin()-elapsedMin()));
+  const em=elapsedMin();
+  const plan=totalPlanMin();
+  const left=Math.max(0,Math.round(plan-em));
+  const overtime=Math.max(0,Math.round(em-plan));
   const mul=(sess&&sess._nextMul)||2;
-  const v=await appConfirm({title:'All goals done! 🔥',body:'You have '+fmtDur(left)+' left. Extras = ×'+mul+' positives (next tier ×'+(mul*2)+'). Penalties stay single. Or end now (−1 pt per remaining minute).',okText:'Add ×'+mul,danger:false});
+  const status=left>0?'You have '+fmtDur(left)+' left.':'Session is '+fmtDur(overtime)+' overtime.';
+  const endNote=left>0?'Or end now (−1 pt per remaining minute).':'Or end now (penalty already accrued).';
+  const v=await appConfirm({title:'All goals done! 🔥',body:status+' Extras = ×'+mul+' positives (next tier ×'+(mul*2)+'). Penalties stay single. '+endNote,okText:'Add ×'+mul,danger:false});
   if(v){ openGoalsModal(true); }
   else {
-    toast('Session ended early — −'+left+' pts');
+    toast(left>0?('Session ended early — −'+left+' pts'):'Session ended');
     await finishSession(true);
   }
 }
@@ -4398,7 +4395,7 @@ function openDurModal(){
   $('smQuick').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.m===50));
   updateEnd();
 }
-function closeAll(){m1.classList.remove('on');m2.classList.remove('on');mBg.classList.remove('on');}
+function closeAll(){m1.classList.remove('on');m2.classList.remove('on');mBg.classList.remove('on');if(_draftDelayTimer){clearInterval(_draftDelayTimer);_draftDelayTimer=null;}}
 function updateEnd(){
   const m=+$('smMin').value||0;
   if(m<5){$('smEnd').textContent='Pick at least 5 minutes';return;}
@@ -4450,6 +4447,25 @@ function autoBalance(){
 }
 function sumPlan(){return draftGoals.reduce((s,g)=>s+(g.planMin||0),0);}
 
+let _draftDelayTimer=null;
+function _autoBumpDraftStart(){
+  // every 60s, if 5min elapsed since draftStartMs, bump by 5min so clocks reflect actual start
+  if(!m2.classList.contains('on'))return;
+  const now=Date.now();
+  if(now-draftStartMs>=5*60000){
+    draftStartMs+=5*60000;
+    updateTotalsAndClocks();
+    // also bump end time pill in sm2Sub
+    if(m2.classList.contains('on')){
+      const sub=$('sm2Sub');if(sub){
+        const startTxt=fmtClock(new Date(draftStartMs));
+        const endTxt=fmtClock(new Date(draftStartMs+draftBudgetMin*60000));
+        const b=sub.querySelector('b');if(b)b.textContent=startTxt+' → '+endTxt;
+      }
+    }
+    toast('Session pushed +5 min — pick up the pace');
+  }
+}
 function openGoalsModal(addingMore){
   m2.classList.add('on');mBg.classList.add('on');
   if(addingMore){
@@ -4457,7 +4473,13 @@ function openGoalsModal(addingMore){
     draftStartMs=Date.now();
     draftGoals=[blankGoal()];
     autoBalance();
+  } else {
+    // reset start time to now for fresh modal open
+    draftStartMs=Date.now();
   }
+  // start auto-bump timer — every 60s checks if 5min elapsed, pushes start forward
+  if(_draftDelayTimer){clearInterval(_draftDelayTimer);_draftDelayTimer=null;}
+  _draftDelayTimer=setInterval(_autoBumpDraftStart,60000);
   const startTxt=fmtClock(new Date(draftStartMs));
   const endTxt=fmtClock(new Date(draftStartMs+draftBudgetMin*60000));
   const tierNote=addingMore?(' <b style="color:#bf5af2">×'+((sess&&sess._nextMul)||2)+' positives</b> for this batch.'):'';
