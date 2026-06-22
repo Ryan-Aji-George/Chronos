@@ -579,6 +579,9 @@ body{
 
 /* today habit card — hero treatment */
 .today-habit-card{position:relative;}
+.barcode-wrap{position:relative;left:50%;transform:translateX(-50%);width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;margin-top:24px;overflow:hidden;}
+.barcode-wrap img{width:100%;height:100%;object-fit:contain;display:block;}
+.barcode-wrap.empty{display:none;}
 .today-head{display:flex;align-items:center;gap:18px;margin-bottom:20px;}
 .today-ring-wrap{position:relative;width:88px;height:88px;flex:none;}
 .today-ring{width:100%;height:100%;transform:rotate(-90deg);overflow:visible;}
@@ -1481,6 +1484,8 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
       </div>
     </div>
 
+    <div class="barcode-wrap empty" id="barcodeWrap" hidden><img id="barcodeImgEl" alt="barcode"></div>
+
   </div>
 </div>
 
@@ -1553,6 +1558,18 @@ button,.tab,.habit-chip,.day-card,.reset-row,.g-item .check,.filt{touch-action:m
     <div class="rr-text"><div class="rr-title">Change Passcode</div><div class="rr-sub">Set a new 6-digit lock code</div></div>
     <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
   </button>
+
+  <div class="sheet-sec" style="margin-top:18px">Barcode</div>
+  <button class="reset-row" id="uploadBarcodeBtn">
+    <div class="rr-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14"/></svg></div>
+    <div class="rr-text"><div class="rr-title" id="barcodeTitle">Upload barcode</div><div class="rr-sub" id="barcodeSub">Show at the bottom of Habits page</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <button class="reset-row danger hidden" id="removeBarcodeBtn">
+    <div class="rr-text"><div class="rr-title">Remove barcode</div><div class="rr-sub">Delete saved image from this device</div></div>
+    <svg class="rr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
+  <input type="file" id="barcodeFile" accept="image/*" style="display:none">
 
   <div class="sheet-sec" style="margin-top:18px">Data</div>
   <button class="reset-row" id="dataMgrBtn">
@@ -1900,8 +1917,8 @@ document.getElementById('factoryResetBtn').onclick=async()=>{
   if(!(await appConfirm({title:'Are you sure?',body:'Last chance. All data will be deleted.',okText:'Delete all',danger:true})))return;
   await wipeAll();
   // wipe ALL kv keys explicitly (in case wipeAll missed any from prior schema)
-  for(const k of ['notes','habits','habitLog','habitAuto','visionBoard','sessions','activeSession','userGoals','subjects','passcode','dailyTarget']){
-    try{await kvPut(k,k==='notes'?'':(k==='visionBoard'||k==='activeSession'||k==='passcode'?null:(k==='habitLog'||k==='habitAuto'?{}:(k==='dailyTarget'?120:[]))));}catch(e){}
+  for(const k of ['notes','habits','habitLog','habitAuto','visionBoard','sessions','activeSession','userGoals','subjects','passcode','dailyTarget','barcodeImg']){
+    try{await kvPut(k,k==='notes'?'':(k==='visionBoard'||k==='activeSession'||k==='passcode'||k==='barcodeImg'?null:(k==='habitLog'||k==='habitAuto'?{}:(k==='dailyTarget'?120:[]))));}catch(e){}
   }
   window._dailyTarget=120;
   if(typeof subjects!=='undefined')subjects=[];
@@ -1916,6 +1933,7 @@ document.getElementById('factoryResetBtn').onclick=async()=>{
   const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
   await loadDay();
   try{_visionShow(null);}catch(e){}
+  try{_barcodeShow(null);}catch(e){}
   try{if(typeof _sessInit==='function')await _sessInit();}catch(e){}
   try{if(typeof loadUserGoals==='function')await loadUserGoals();}catch(e){}
   syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();
@@ -1928,13 +1946,14 @@ async function buildBackup(){
   const days=await dbAll();
   const dayMap={};days.forEach(d=>dayMap[d.date]=d);
   dayMap[state.date]={date:state.date,elapsed:currentMs(),goals:state.goals};
-  let visionBoard=null,sessions=null,activeSession=null,userGoalsKv=null,passcode=null,dailyTarget=null;
+  let visionBoard=null,sessions=null,activeSession=null,userGoalsKv=null,passcode=null,dailyTarget=null,barcodeImg=null;
   try{visionBoard=await kvGet('visionBoard');}catch(e){}
   try{sessions=await kvGet('sessions');}catch(e){}
   try{activeSession=await kvGet('activeSession');}catch(e){}
   try{userGoalsKv=await kvGet('userGoals');}catch(e){}
   try{passcode=await kvGet('passcode');}catch(e){}
   try{dailyTarget=await kvGet('dailyTarget');}catch(e){}
+  try{barcodeImg=await kvGet('barcodeImg');}catch(e){}
   let subjectsKv=null;try{subjectsKv=await kvGet('subjects');}catch(e){}
   return {
     app:'Chronos',
@@ -1952,7 +1971,8 @@ async function buildBackup(){
     userGoals:Array.isArray(userGoalsKv)?userGoalsKv:[],
     subjects:Array.isArray(subjectsKv)?subjectsKv:[],
     passcode:typeof passcode==='string'?passcode:null,
-    dailyTarget:typeof dailyTarget==='number'?dailyTarget:120
+    dailyTarget:typeof dailyTarget==='number'?dailyTarget:120,
+    barcodeImg:typeof barcodeImg==='string'?barcodeImg:null
   };
 }
 document.getElementById('exportBtn').onclick=async()=>{
@@ -1993,6 +2013,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
     await kvPut('subjects',Array.isArray(parsed.subjects)?parsed.subjects:[]);
     if(typeof parsed.passcode==='string'&&/^\d{6}$/.test(parsed.passcode))await kvPut('passcode',parsed.passcode);
     if(typeof parsed.dailyTarget==='number'&&parsed.dailyTarget>=5)await kvPut('dailyTarget',parsed.dailyTarget);
+    await kvPut('barcodeImg',(typeof parsed.barcodeImg==='string'&&parsed.barcodeImg)?parsed.barcodeImg:null);
     // refresh in-memory state
     await loadDay();
     try{await loadUserGoals();pruneDoneGoals();}catch(e){}
@@ -2006,6 +2027,7 @@ document.getElementById('importFile').onchange=async(ev)=>{
     const hs=document.getElementById('habitSearch');if(hs)hs.value='';
     const hsc=document.getElementById('habitSearchClear');if(hsc)hsc.classList.add('hide');
     try{var _vb=await kvGet('visionBoard');_visionShow(_vb||null);}catch(e){}
+    try{await renderBarcode();}catch(e){}
     syncUI();render();renderGoals();renderNotes();buildStats();renderHabitsAll();
     if(typeof _sessInit==='function')await _sessInit();
     toast('Backup imported');
@@ -3743,6 +3765,55 @@ function _visionPick(){document.getElementById('visionFile').click();}
   };
 })();
 
+/* ---------- barcode ---------- */
+function _barcodeShow(dataUrl){
+  var wrap=document.getElementById('barcodeWrap');
+  var img=document.getElementById('barcodeImgEl');
+  var rm=document.getElementById('removeBarcodeBtn');
+  var title=document.getElementById('barcodeTitle');
+  var sub=document.getElementById('barcodeSub');
+  if(dataUrl){
+    if(img)img.src=dataUrl;
+    if(wrap){wrap.hidden=false;wrap.classList.remove('empty');}
+    if(rm)rm.classList.remove('hidden');
+    if(title)title.textContent='Change barcode';
+    if(sub)sub.textContent='Replace the saved image';
+  }else{
+    if(img)img.removeAttribute('src');
+    if(wrap){wrap.hidden=true;wrap.classList.add('empty');}
+    if(rm)rm.classList.add('hidden');
+    if(title)title.textContent='Upload barcode';
+    if(sub)sub.textContent='Show at the bottom of Habits page';
+  }
+}
+async function renderBarcode(){
+  try{var url=await kvGet('barcodeImg');_barcodeShow(url||null);}catch(e){_barcodeShow(null);}
+}
+(function(){
+  var upBtn=document.getElementById('uploadBarcodeBtn');
+  var rmBtn=document.getElementById('removeBarcodeBtn');
+  var fileEl=document.getElementById('barcodeFile');
+  if(upBtn)upBtn.onclick=function(){if(fileEl)fileEl.click();};
+  if(rmBtn)rmBtn.onclick=async function(){
+    if(!(await appConfirm({title:'Remove barcode?',body:'Image will be deleted from this device.',okText:'Remove',danger:true})))return;
+    try{await kvPut('barcodeImg',null);}catch(e){}
+    _barcodeShow(null);toast('Barcode removed');
+  };
+  if(fileEl)fileEl.onchange=function(ev){
+    var f=ev.target.files&&ev.target.files[0];if(!f){return;}
+    if(!/^image\//.test(f.type)){toast('Pick an image');return;}
+    var reader=new FileReader();
+    reader.onload=async function(){
+      var url=reader.result;
+      try{await kvPut('barcodeImg',url);}catch(e){toast('Save failed');return;}
+      _barcodeShow(url);toast('Barcode saved');
+    };
+    reader.onerror=function(){toast('Read failed');};
+    reader.readAsDataURL(f);
+    fileEl.value='';
+  };
+})();
+
 /* ---------- boot ---------- */
 (async function(){
   await openDB();
@@ -3752,6 +3823,7 @@ function _visionPick(){document.getElementById('visionFile').click();}
   try{const t=await kvGet('dailyTarget');window._dailyTarget=(typeof t==='number'&&t>0)?t:120;}catch(e){window._dailyTarget=120;}
   try{globalNotes=(await kvGet('notes'))||'';}catch(e){globalNotes='';}
   try{var vb=await kvGet('visionBoard');if(vb)_visionShow(vb);}catch(e){}
+  try{await renderBarcode();}catch(e){}
   try{await loadHabits();}catch(e){habits=[];habitLog={};habitAuto={};}
   syncUI();renderGoals();renderNotes();render();tick();renderHabitsAll();
   if(typeof _sessInit==='function')_sessInit();
@@ -5083,7 +5155,7 @@ button:focus:not(:focus-visible){outline:none;}
   font-family:inherit;letter-spacing:.4px;text-transform:uppercase;transition:.15s;}
 .fc-tabs button.on{background:linear-gradient(180deg,#3a98ff,#0a72e8);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(10,132,255,.3);}
 .fc-tabs button:active{transform:scale(.96);}
-.focus-chart{display:flex;align-items:flex-end;gap:6px;height:110px;padding:8px 4px;
+.focus-chart{display:flex;align-items:flex-end;gap:6px;height:180px;padding:10px 4px;
   border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.02);margin-bottom:10px;}
 .fc-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0;height:100%;}
 .fc-bar-wrap{flex:1;width:100%;max-width:30px;display:flex;align-items:flex-end;justify-content:center;}
@@ -5702,6 +5774,7 @@ if(typeof window.openDay==='function'){
     {id:'habitLog',label:'Habit check history',desc:'daily check marks',dated:true,perHabit:true},
     {id:'habitAuto',label:'Habit auto state',desc:'auto-tracking state',dated:false},
     {id:'visionBoard',label:'Vision board',desc:'uploaded image',dated:false},
+    {id:'barcodeImg',label:'Barcode image',desc:'uploaded barcode',dated:false},
     {id:'notes',label:'Global notes',desc:'persistent note text',dated:false},
     {id:'userGoals',label:'Goal list',desc:'persistent user-managed goals',dated:false},
     {id:'subjects',label:'Subjects',desc:'goal subject categories',dated:false},
@@ -5962,6 +6035,8 @@ if(typeof window.openDay==='function'){
       await kvPut('activeSession',null);
     } else if(tid==='visionBoard'){
       await kvPut('visionBoard',null);
+    } else if(tid==='barcodeImg'){
+      await kvPut('barcodeImg',null);try{_barcodeShow(null);}catch(e){}
     } else if(tid==='notes'){
       await kvPut('notes','');
     } else if(tid==='userGoals'){
@@ -6061,6 +6136,7 @@ if(typeof window.openDay==='function'){
     try{if(typeof loadSubjects==='function')await loadSubjects();}catch(e){}
     try{if(typeof loadUserGoals==='function'){await loadUserGoals();pruneDoneGoals();}}catch(e){}
     try{const vb=await kvGet('visionBoard');if(typeof _visionShow==='function')_visionShow(vb||null);}catch(e){}
+    try{if(typeof renderBarcode==='function')await renderBarcode();}catch(e){}
     try{if(typeof _sessInit==='function')await _sessInit();}catch(e){}
     try{syncUI();}catch(e){}
     try{renderGoals();}catch(e){}
