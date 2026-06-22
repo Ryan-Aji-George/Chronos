@@ -5092,6 +5092,11 @@ button:focus:not(:focus-visible){outline:none;}
 .fc-bar.amber{background:linear-gradient(180deg,#ffb340,#d6852a);}
 .fc-bar.red{background:linear-gradient(180deg,#ff6b60,#d6352b);}
 .fc-bar.empty{background:rgba(255,255,255,.06);}
+.focus-chart.bipolar .fc-bar-wrap{align-items:center;position:relative;}
+.focus-chart.bipolar .fc-bar-wrap::before{content:"";position:absolute;left:-2px;right:-2px;top:50%;height:1px;background:rgba(255,255,255,.14);pointer-events:none;}
+.focus-chart.bipolar .fc-bar{position:absolute;left:50%;transform:translateX(-50%);width:100%;max-width:30px;}
+.focus-chart.bipolar .fc-bar.up{bottom:50%;border-radius:6px 6px 2px 2px;}
+.focus-chart.bipolar .fc-bar.down{top:50%;border-radius:2px 2px 6px 6px;background:linear-gradient(0deg,#ff6b60,#d6352b);}
 .fc-lbl{font-size:9.5px;color:var(--text-3);font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
 .fc-val{font-size:9.5px;color:var(--text-2);font-weight:700;font-variant-numeric:tabular-nums;display:none;}
 /* tap popup for momentum bar values */
@@ -5425,6 +5430,8 @@ function populateFcChart(){
   let maxAbs=0;
   bars.forEach(b=>{if(b.pts!=null)maxAbs=Math.max(maxAbs,Math.abs(b.pts));});
   if(maxAbs<1)maxAbs=1;
+  const hasNeg=bars.some(b=>b.pts!=null && b.pts<0);
+  fc.classList.toggle('bipolar',hasNeg);
   const periodBucket=_rankBucket(bars.map(b=>b.pts));
   // incremental update — reuse existing cols if same count, else rebuild
   const existing=fc.children;
@@ -5449,12 +5456,14 @@ function populateFcChart(){
     const lblEl=col.querySelector('.fc-lbl');
     const hasData=b.pts!=null && b.pts!==0;
     const color=!hasData?'empty':(b.pts<0?'red':periodBucket(b.pts));
-    bar.className='fc-bar '+color;
+    const dir=hasData?(b.pts<0?' down':' up'):'';
+    bar.className='fc-bar '+color+dir;
     // empty/null/zero → hide bar entirely (no placeholder stub)
     if(!hasData){bar.style.height='0px';bar.style.visibility='hidden';}
     else{
       bar.style.visibility='';
-      const pct=Math.max(4,Math.abs(b.pts)/maxAbs*100);
+      const scale=hasNeg?50:100;
+      const pct=Math.max(4,Math.abs(b.pts)/maxAbs*scale);
       const nextH=pct+'%';
       if(bar.style.height!==nextH){
         if(needRebuild){bar.style.height='0%';setTimeout(()=>{bar.style.height=nextH;},60+i*35);}
