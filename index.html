@@ -1111,21 +1111,23 @@ html.locked .lock{display:flex;}
 .lock-brand{display:none;}
 .lock-hint{font-size:12px;font-weight:600;color:rgba(255,255,255,.42);letter-spacing:3.5px;
   margin-bottom:32px;text-transform:uppercase;}
-.lock-dots{display:flex;justify-content:center;gap:26px;}
-.lock-dot{width:15px;height:15px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.28);
-  background:transparent;position:relative;
-  transition:background .4s cubic-bezier(.22,1,.36,1),border-color .4s,transform .55s cubic-bezier(.34,1.56,.64,1),box-shadow .4s;}
-.lock-dot.on{background:#fff;border-color:#fff;
-  box-shadow:0 0 18px rgba(255,255,255,.55),0 0 4px rgba(255,255,255,.35);}
-.lock-dot.on::after{content:"";position:absolute;inset:-12px;border-radius:50%;
-  background:radial-gradient(circle,rgba(255,255,255,.55),transparent 60%);
-  pointer-events:none;animation:lockDotHalo .65s cubic-bezier(.22,1,.36,1);}
-@keyframes lockDotHalo{from{opacity:1;transform:scale(.4);}to{opacity:0;transform:scale(1.9);}}
-.lock-dot.on{animation:lockDotPop .5s cubic-bezier(.34,1.56,.64,1);}
-@keyframes lockDotPop{0%{transform:scale(.35);}55%{transform:scale(1.45);}100%{transform:scale(1);}}
-.lock-dot.success{background:#30d158;border-color:#30d158;
-  box-shadow:0 0 22px rgba(48,209,88,.65);
-  transition:background .4s,border-color .4s,box-shadow .4s;}
+.lock-dots{display:flex;justify-content:center;gap:24px;}
+.lock-dot{width:14px;height:14px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.22);position:relative;
+  transform:scale(.85);
+  transition:background .3s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.34,1.56,.64,1),box-shadow .35s cubic-bezier(.22,1,.36,1);}
+.lock-dot::after{content:"";position:absolute;inset:-10px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.55),transparent 65%);
+  opacity:0;transform:scale(.5);pointer-events:none;}
+.lock-dot.on{background:#fff;
+  transform:scale(1.15);
+  box-shadow:0 0 18px rgba(255,255,255,.65),0 0 5px rgba(255,255,255,.45);}
+.lock-dot.on::after{animation:lockHalo .65s cubic-bezier(.22,1,.36,1);}
+@keyframes lockHalo{0%{opacity:.95;transform:scale(.4);}100%{opacity:0;transform:scale(2);}}
+.lock-dot.success{background:#30d158;
+  transform:scale(1.15);
+  box-shadow:0 0 22px rgba(48,209,88,.7),0 0 6px rgba(48,209,88,.5);}
+.lock-dot.success::after{background:radial-gradient(circle,rgba(48,209,88,.6),transparent 65%);}
 .lock-err{font-size:12.5px;color:#ff8a82;font-weight:500;letter-spacing:.3px;
   opacity:0;transition:opacity .35s cubic-bezier(.22,1,.36,1);min-height:18px;margin-top:24px;
   text-shadow:0 0 14px rgba(255,107,98,.4);}
@@ -1178,6 +1180,35 @@ html.lock-revealing .app{animation:appGhostIn 1s cubic-bezier(.22,1,.36,1) both;
 .lock-key.kp-del{background:transparent;color:rgba(255,255,255,.85);font-size:14px;font-weight:500;backdrop-filter:none;-webkit-backdrop-filter:none;}
 .lock-key.kp-del:active{background:rgba(255,255,255,.15);}
 .lock-key.kp-del svg{width:26px;height:26px;}
+
+/* reusable passcode prompt modal */
+.pc-modal{position:fixed;inset:0;z-index:210;display:none;align-items:center;justify-content:center;
+  background:rgba(5,8,16,.78);
+  backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
+  padding:24px;
+  opacity:0;transition:opacity .35s cubic-bezier(.22,1,.36,1);}
+.pc-modal.on{display:flex;opacity:1;}
+.pc-modal-sheet{position:relative;width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;
+  transform:translateY(20px) scale(.96);opacity:0;
+  transition:transform .45s cubic-bezier(.34,1.56,.64,1),opacity .35s cubic-bezier(.22,1,.36,1);}
+.pc-modal.on .pc-modal-sheet{transform:translateY(0) scale(1);opacity:1;}
+.pc-title{font-size:26px;font-weight:700;color:#fff;letter-spacing:-.6px;text-align:center;margin-bottom:10px;
+  background:linear-gradient(180deg,#ffffff 0%,#ffffff 55%,rgba(200,220,255,.7) 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 16px rgba(10,132,255,.25));}
+.pc-body{font-size:13.5px;font-weight:500;color:rgba(255,255,255,.55);letter-spacing:.2px;text-align:center;margin-bottom:32px;line-height:1.45;max-width:280px;}
+.pc-modal .lock-dots{gap:26px;}
+.pc-modal .lock-dot{width:15px;height:15px;}
+.pc-modal .lock-dot::after{inset:-12px;}
+.pc-err{font-size:12.5px;color:#ff8a82;font-weight:500;letter-spacing:.3px;
+  opacity:0;transition:opacity .3s;min-height:18px;margin-top:18px;
+  text-shadow:0 0 12px rgba(255,107,98,.4);}
+.pc-err.show{opacity:1;}
+.pc-keypad{margin-top:28px;}
+.pc-cancel{margin-top:24px;background:transparent;border:none;color:rgba(255,255,255,.6);font-family:inherit;font-size:14px;font-weight:500;letter-spacing:.2px;padding:10px 24px;border-radius:24px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .2s,background .2s;}
+.pc-cancel:active{background:rgba(255,255,255,.08);color:#fff;}
+@keyframes pcShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}50%{transform:translateX(8px);}75%{transform:translateX(-5px);}}
+.pc-modal-sheet.shake{animation:pcShake .4s cubic-bezier(.32,.72,0,1);}
 
 /* in-app modal (confirm + prompt) */
 .modal-bg{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
@@ -1482,6 +1513,34 @@ input,textarea,select{
 </head>
 <body>
 <script>document.documentElement.classList.add('locked');</script>
+
+<!-- reusable passcode prompt -->
+<div class="pc-modal" id="pcModal">
+  <div class="pc-modal-sheet">
+    <div class="pc-title" id="pcTitle">Verify it's you</div>
+    <div class="pc-body" id="pcBody">Enter your 6-digit passcode</div>
+    <div class="lock-dots" id="pcDots">
+      <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
+      <span class="lock-dot"></span><span class="lock-dot"></span><span class="lock-dot"></span>
+    </div>
+    <div class="pc-err" id="pcErr"></div>
+    <div class="lock-keypad pc-keypad" id="pcKeypad">
+      <button class="lock-key" data-pc-d="1" type="button">1</button>
+      <button class="lock-key" data-pc-d="2" type="button">2</button>
+      <button class="lock-key" data-pc-d="3" type="button">3</button>
+      <button class="lock-key" data-pc-d="4" type="button">4</button>
+      <button class="lock-key" data-pc-d="5" type="button">5</button>
+      <button class="lock-key" data-pc-d="6" type="button">6</button>
+      <button class="lock-key" data-pc-d="7" type="button">7</button>
+      <button class="lock-key" data-pc-d="8" type="button">8</button>
+      <button class="lock-key" data-pc-d="9" type="button">9</button>
+      <button class="lock-key kp-blank" type="button" aria-hidden="true" tabindex="-1"></button>
+      <button class="lock-key" data-pc-d="0" type="button">0</button>
+      <button class="lock-key kp-del" data-pc-del="1" type="button" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8L2 12l6 8h13a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/><path d="M18 9l-6 6M12 9l6 6"/></svg></button>
+    </div>
+    <button class="pc-cancel" id="pcCancel" type="button">Cancel</button>
+  </div>
+</div>
 
 <!-- passcode lock -->
 <div class="lock" id="lockScreen" role="dialog" aria-modal="true">
@@ -3794,6 +3853,90 @@ _wirePager('timerPager','timerDots');
   if(btn)btn.onclick=function(){sSheet.classList.add('on');sBg.classList.add('on');};
 })();
 
+/* reusable passcode prompt — same keypad as lock screen */
+(function(){
+  var modal=document.getElementById('pcModal');
+  if(!modal)return;
+  var sheet=modal.querySelector('.pc-modal-sheet');
+  var titleEl=document.getElementById('pcTitle');
+  var bodyEl=document.getElementById('pcBody');
+  var dots=modal.querySelectorAll('#pcDots .lock-dot');
+  var errEl=document.getElementById('pcErr');
+  var cancelBtn=document.getElementById('pcCancel');
+  var keypad=document.getElementById('pcKeypad');
+  var buffer='';
+  var resolver=null;
+  var verifier=null;
+  function syncDots(){dots.forEach(function(d,i){d.classList.toggle('on',i<buffer.length);d.classList.remove('success');});}
+  function open(opts){
+    return new Promise(function(resolve){
+      resolver=resolve;
+      verifier=(opts&&opts.verify)||null;
+      buffer='';syncDots();
+      errEl.classList.remove('show');errEl.textContent='';
+      titleEl.textContent=(opts&&opts.title)||'Enter passcode';
+      bodyEl.textContent=(opts&&opts.body)||'';
+      bodyEl.style.display=bodyEl.textContent?'':'none';
+      modal.classList.add('on');
+    });
+  }
+  function close(val){
+    modal.classList.remove('on');
+    var r=resolver;resolver=null;verifier=null;
+    if(r)setTimeout(function(){r(val);},250);
+  }
+  function submit(){
+    var code=buffer;
+    if(verifier){
+      if(verifier(code)){
+        // green cascade then smooth fade-close
+        dots.forEach(function(d,i){
+          setTimeout(function(){d.classList.remove('on');d.classList.add('success');},i*55);
+        });
+        try{if(navigator.vibrate)navigator.vibrate(20);}catch(e){}
+        setTimeout(function(){close(code);},dots.length*55+450);
+      } else {
+        shake('Wrong passcode');
+      }
+    } else {
+      // no verifier — return raw code immediately
+      buffer='';setTimeout(function(){close(code);},120);
+    }
+  }
+  function push(d){
+    if(buffer.length>=6)return;
+    buffer+=String(d);syncDots();
+    try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}
+    errEl.classList.remove('show');
+    if(buffer.length===6)setTimeout(submit,100);
+  }
+  function pop(){
+    if(!buffer.length)return;
+    buffer=buffer.slice(0,-1);syncDots();
+    try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}
+  }
+  function shake(msg){
+    sheet.classList.remove('shake');void sheet.offsetWidth;sheet.classList.add('shake');
+    if(msg){errEl.textContent=msg;errEl.classList.add('show');}
+    try{if(navigator.vibrate)navigator.vibrate([30,40,30]);}catch(e){}
+    setTimeout(function(){buffer='';syncDots();},650);
+  }
+  keypad.addEventListener('click',function(ev){
+    var btn=ev.target.closest('.lock-key');if(!btn)return;
+    if(btn.dataset.pcDel){pop();return;}
+    if(btn.dataset.pcD!=null)push(btn.dataset.pcD);
+  });
+  cancelBtn.onclick=function(){close(null);};
+  document.addEventListener('keydown',function(ev){
+    if(!modal.classList.contains('on'))return;
+    if(ev.key>='0'&&ev.key<='9'){ev.preventDefault();push(ev.key);}
+    else if(ev.key==='Backspace'||ev.key==='Delete'){ev.preventDefault();pop();}
+    else if(ev.key==='Escape'){ev.preventDefault();close(null);}
+  });
+  window.passcodePrompt=open;
+  window.passcodePromptShake=shake;
+})();
+
 /* passcode lock */
 (function(){
   var PASS='779549';
@@ -3988,9 +4131,8 @@ function _visionShow(dataUrl){
 }
 async function _visionRevealFlow(){
   if(!_visionDataUrl){toast('No vision board');return;}
-  var code=await appPrompt({title:'Verify it\'s you',body:'Enter your 6-digit passcode to reveal the vision board.',type:'password',inputmode:'numeric',maxlength:6,placeholder:'••••••',okText:'Unlock'});
+  var code=await window.passcodePrompt({title:'Verify it\'s you',body:'Enter your 6-digit passcode to reveal the vision board.',verify:window.__verifyPass});
   if(code==null)return;
-  if(!window.__verifyPass||!window.__verifyPass(code)){toast('Wrong passcode');return;}
   _visionUnlocked=true;
   var wrap=document.getElementById('visionWrap');
   var edit=document.getElementById('visionEdit');
