@@ -3647,8 +3647,7 @@ document.body.classList.add('view-timer');
     const idx=VIEW_ORDER.indexOf(prev),tIdx=VIEW_ORDER.indexOf(toName);
     if(idx<0||tIdx<0)return false;
     const dir=tIdx>idx?1:-1;
-    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===toName));
-    moveTabInd(document.querySelector('.tab.active'));
+    // tab toggle deferred — runs inside pendingFinalize via switchView once slide settles
     curView=document.querySelector('.view:not(.hidden)');
     if(!curView)return false;
     captureStageBox();
