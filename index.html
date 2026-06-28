@@ -3656,15 +3656,17 @@ document.body.classList.add('view-timer');
     const el=viewById(toName);
     el.classList.remove('hidden');
     try{el.scrollTop=_viewTargetY(toName);}catch(e){}
-    // build BEFORE slide so view is fully populated as it enters viewport
-    try{prepareView(toName);}catch(e){}
-    try{el.scrollTop=_viewTargetY(toName);}catch(e){}
     el.classList.add('swipe-in');
     applyStageBox(el);
     el.style.zIndex='3';
     el.style.transform='translate3d('+(dir>0?100:-100)+'%,0,0)';
     nextView=el;nextDir=dir;
     void el.offsetWidth;
+    // defer heavy DOM work to NEXT frame so navbar transition gets clean first paint
+    requestAnimationFrame(()=>{
+      try{prepareView(toName);}catch(e){}
+      try{el.scrollTop=_viewTargetY(toName);}catch(e){}
+    });
     commit(dir,toName);
     return true;
   };
